@@ -1,0 +1,24 @@
+{
+  "name": "clinamen-behaviortree",
+  "version": "0.0.1",
+  "description": "Simple and generic behavior tree for use in games, simulations and basic computations.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mecanosfera/clinamen-behaviortree.git"
+  },
+  "keywords": [
+    "behavior-tree",
+    "simulation",
+    "ai"
+  ],
+  "author": "Carlos A. Cardoso Filho",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/mecanosfera/clinamen-behaviortree/issues"
+  },
+  "homepage": "https://github.com/mecanosfera/clinamen-behaviortree#readme"
+}

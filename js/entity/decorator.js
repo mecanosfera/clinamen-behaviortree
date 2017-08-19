@@ -1,6 +1,6 @@
 var Composite = request('./composite.js').Composite;
 
-class Decorator extends Behavior{
+class Decorator extends Composite{
 
 	init(args){
 		super.init(args);
@@ -18,6 +18,7 @@ class Decorator extends Behavior{
 		} else {
 			this.child = null;
 		}
+		return this;
 	}
 
 	setAgent(agent){
@@ -27,6 +28,7 @@ class Decorator extends Behavior{
 				this.child.setAgent(agent);
 			}
 		}
+		return this;
 	}
 
 	add(behavior){
@@ -36,6 +38,7 @@ class Decorator extends Behavior{
 		}
 		child.setAgent(this.agent);
 		this.child = child;
+		return this;
 	}
 
 	//arrumar
@@ -52,9 +55,44 @@ class Decorator extends Behavior{
 
 	}
 
-	toJson(){
-		var js = super.toJson();
-		js.child = this.child.toJson();
+	fail(stack){
+		stack.pop();
+		stack.last().node.fail(stack);
+		return this;
+	}
+
+	success(stack){
+		stack.pop();
+		stack.last().node.success(stack);
+		return this;
+	}
+
+	next(stack){
+		if(this.testCondition()){
+			stack.push(this.child);
+		} else {
+			this.fail(stack);
+		}
+		return this;
+	}
+
+	testCondition(){
+		return false;
+	}
+
+	run(){
+		if(!this.child){
+			return false;
+		}
+		if(this.testCondition()){
+			return this.child.run();
+		}
+		return false;
+	}
+
+	json(){
+		var js = super.json();
+		js.child = this.child.json();
 		js.filter = JSON.stringify(this.filter);
 		js.result = JSON.stringify(this.result);
 		return js;
@@ -70,11 +108,13 @@ class Inverter extends Decorator{
 		this.type="inverter";
 	}
 
-	run(iterator=false){
+	//ajeitar next e afins
+
+	run(){
 		if(this.child==null){
 			return false;
 		}
-		return !this.child.run(iterator);
+		return !this.child.run();
 	}
 
 }
@@ -89,7 +129,7 @@ class Limit extends Decorator{
 		this.runs = 0;
 	}
 
-	run(iterator=false){
+	testCondition(){
 		if(this.child==null){
 			return false;
 		}
@@ -97,11 +137,11 @@ class Limit extends Decorator{
 			return false;
 		}
 		this.runs++;
-		return this.child.run(iterator);
+		return true;
 	}
 
-	toJson(){
-		var js = super.toJson();
+	json(){
+		var js = super.json();
 		js.max = this.max;
 		js.runs = this.runs;
 		return js;
@@ -119,7 +159,7 @@ class Find extends Decorator{
 			this.scope = args.scope || 'world';
 		}
 
-		run(iterator=false){
+		testCondition(){
 			if(this.agent.temp && this.result!=null){
 				this.agent.res[this.result] = null;
 			}
@@ -133,13 +173,12 @@ class Find extends Decorator{
 				this.agent.res[this.result] = res;
 			}
 			if(res!=null && this.child!=null){
-				return this.child.run(iterator);
+				return true;
 			}
-			return false;
 		}
 
-		toJson(){
-			var js = super.toJson();
+		json(){
+			var js = super.json();
 			js.scope = this.scope;
 			return js;
 		}
@@ -154,14 +193,35 @@ class Condition extends Decorator{
 		this.type = 'test';
 	}
 
-	run(iterator=false){
+	testCondition(){
 		var v1 = this.traverse(this.agent,{Object.keys(this.filter)[0]:this.filter[Object.keys(this.filter)[0]]});
 		var v2 = this.filter.val || this.traverse(this.agent,{Object.keys(this.filter)[2]:this.filter[Object.keys(this.filter)[2]]});
 
 		if(this.op[this.filter.op](v1,v2) && this.child!=null){
-			return this.child.run(iterator);
+			return true;
 		}
 		return false;
+	}
+
+	fail(stack){
+		stack.pop();
+		stack.last().node.fail(stack);
+		return this;
+	}
+
+	success(stack){
+		stack.pop();
+		stack.last().node.success(stack);
+		return this;
+	}
+
+	next(stack){
+		if(this.testCondition()){
+			stack.push(this.child);
+		} else {
+			this.fail(stack);
+		}
+		return this;
 	}
 
 }
@@ -198,10 +258,10 @@ class Count extends Decorator {
 }
 
 module.exports = {
-	'Decorator'	:Decorator,
-	'Inverter'	:Inverter,
-	'Limit'		:Limit,
-	'Condition'	:Condition,
-	'Find'		:Find,
-	'Count'		:Count	
+	'Decorator'	: Decorator,
+	'Inverter'	: Inverter,
+	'Limit'			: Limit,
+	'Condition'	: Condition,
+	'Find'			: Find,
+	'Count'			: Count
 }

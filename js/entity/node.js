@@ -1,23 +1,47 @@
-class Entity {
+class Node {
 
   constructor(args={}){
     this.init(args);
   }
 
   init(args){
-    this.name = args.name || null;
-    this.mainType = 'entity';
-    this.type ='entity';
-    this.res = {};
+    this.mainType = 'node';
+    this.type ='node';
+    this.name = args.name;
     this.temp = args.temp || true;
+    this.res = {};
+    this.prop = {};
     this.children = [];
 
-    this.prop = {};
     if(args.prop!=null){
 			for(let s in args.prop){
 				this.prop[s] = args.prop[s];
 			}
 		}
+
+    this.stack = {
+      _stack: [],
+      done: false,
+      push: function(node){
+        if(this._stack.length==0){
+          this.done = false;
+        }
+        this._stack.push({index:0, node:node});
+      },
+      pop: function(){
+        return this._stack.pop();
+      },
+      last: function(){
+        return this._stack[this._stack.length-1];
+      }
+    };
+
+    Object.definePropert(this.stack,'length',{
+      writable: false,
+      enumerable: true,
+      get: function(){return this.stack._stack.length;}
+    });
+
 
     this.op = {
     		"+": 	function(a,b){return a+b},
@@ -38,25 +62,44 @@ class Entity {
     };
   }
 
-  run(iterator=false){
+  remove(filter){
+    if(!filter || filter=={}){
+      this.children = [];
+    } else if (filter) {
+      for(let i = this.children.length-1; i>=0; i--){
+        var rmv = true;
+        for(let p in filter){
+          if(!(p in this.children[p]) || this.children[i][p]!=filter[p]){
+            rmv = false;
+            break;
+          }
+        }
+        if(rmv){
+          this.children.splice(i,1);
+        }
+      }
+    }
+  }
+
+  run(callstack){
     return false;
   }
 
-  toJson(){
+  json(){
     var js = {
 			type: this.type,
 			name: this.name,
-			prop: JSON.stringify(this.prop),
+			prop: this.prop,
       temp: this.temp,
 			children: []
 		}
 		for(let c of this.children){
-			js.children.push(c.toJson());
+			js.children.push(c.json());
 		}
     return js;
   }
 
-  behaviorConstructor(node){
+  nodeConstructor(node){
   	switch(node.type.toLowerCase()){
   		case "selector":
   			return new Selector(node);
@@ -106,4 +149,4 @@ class Entity {
 
 }
 
-module.exports = Entity;
+module.exports = Node;
