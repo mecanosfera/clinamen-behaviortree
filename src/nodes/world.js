@@ -1,5 +1,3 @@
-var Node = require('./node.js');
-
 class World extends Node{
 
   init(args){
@@ -107,5 +105,3 @@ class World extends Node{
   }
 
 }
-
-module.exports = World;

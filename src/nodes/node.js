@@ -13,6 +13,7 @@ class Node {
     this.prop = {};
     this.children = [];
 
+    //console.log(args.prop);
     if(args.prop!=null){
 			for(let s in args.prop){
 				this.prop[s] = args.prop[s];
@@ -22,11 +23,12 @@ class Node {
     this.stack = {
       _stack: [],
       done: false,
-      push: function(node){
+      push: function(node,root=false){
         if(this._stack.length==0){
           this.done = false;
+          root = true;
         }
-        this._stack.push({index:0, node:node});
+        this._stack.push({index:0, node:node, root:root});
       },
       pop: function(){
         return this._stack.pop();
@@ -36,11 +38,43 @@ class Node {
       }
     };
 
-    Object.definePropert(this.stack,'length',{
-      writable: false,
+    var stack = this.stack;
+
+    Object.defineProperty(stack,'length',{
       enumerable: true,
-      get: function(){return this.stack._stack.length;}
+      get: function(){return stack._stack.length;}
     });
+
+    this.stack = stack;
+
+    this.nodeConstructor = function(node){
+
+    	switch(node.type.toLowerCase()){
+    		case "selector":
+    			return new Selector(node);
+    		case "sequence":
+    			return new Sequence(node);
+    		case "randomselector":
+    			return new RandomSelector(node);
+    		case "randomsequence":
+    			return new RandomSequence(node);
+    		case "inverter":
+    			return new Inverter(node);
+    		case "limit":
+    			return new Limit(node);
+    		case "find":
+    			return new Find(node);
+    		case "test":
+    			return new Test(node);
+    		case "count":
+    			return new Count(node);
+    		case "condition":
+    			return new Condition(node);
+    		case "action":
+    			return new Action(node);
+    	}
+    	return null;
+    }
 
 
     this.op = {
@@ -60,6 +94,10 @@ class Node {
     		"&&": function(a,b){return a&&b},
     		"||": function(a,b){return a||b}
     };
+  }
+
+  add(node){
+    return this;
   }
 
   remove(filter){
@@ -93,39 +131,15 @@ class Node {
       temp: this.temp,
 			children: []
 		}
-		for(let c of this.children){
-			js.children.push(c.json());
-		}
+    if(this.children!=null){
+  		for(let c of this.children){
+  			js.children.push(c.json());
+  		}
+    }
     return js;
   }
 
-  nodeConstructor(node){
-  	switch(node.type.toLowerCase()){
-  		case "selector":
-  			return new Selector(node);
-  		case "sequence":
-  			return new Sequence(node);
-  		case "randomselector":
-  			return new RandomSelector(node);
-  		case "randomsequence":
-  			return new RandomSequence(node);
-  		case "inverter":
-  			return new Inverter(node);
-  		case "limit":
-  			return new Limit(node);
-  		case "find":
-  			return new Find(node);
-  		case "test":
-  			return new Test(node);
-  		case "count":
-  			return new Count(node);
-  		case "condition":
-  			return new Condition(node);
-  		case "action":
-  			return new Action(node);
-  	}
-  	return null;
-  }
+
 
   shuffle(ar,copy=true){
   	var a = ar;
@@ -148,5 +162,3 @@ class Node {
   }
 
 }
-
-module.exports = Node;

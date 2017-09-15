@@ -1,6 +1,3 @@
-var Node = require('./node.js');
-var Composite = require('./composite.js').Composite;
-
 class Agent extends Node {
 
 	init(args){
@@ -9,7 +6,6 @@ class Agent extends Node {
 		this.type = args.type || 'agent';
 		this.template = args.template || this.type;
 		this.world = args.world;
-		this._stack = [];
 
 		if(args.children!=null){
 			for(let c of args.children){
@@ -78,12 +74,12 @@ class Agent extends Node {
 		return this;
 	}
 
-	run(callstack){
+	run(){
 		if(this.temp){
 			this.res = {};
 		}
 		if(this.children.length>0){
-			return this.children[0].run(callstack);
+			return this.children[0].run();
 		}
 		return false;
 	}
@@ -96,6 +92,3 @@ class Agent extends Node {
 
 
 }
-
-
-module.exports = Action;

@@ -1,5 +1,3 @@
-var Composite = require('./composite.js').Composite;
-
 class Action extends Composite {
 
 	init(args){
@@ -33,21 +31,17 @@ class Action extends Composite {
 	}
 
 
-	run(callstack){
-		if(callstack){
-			return {end:false,value:this.run()};
+	run(){
+		if(this.target=='self'){
+			return this.agent.act(this.act,this.value);
+		} else if (this.target=='world'){
+			return this.agent.world.act(this.act,this.value);
 		} else {
-			if(this.target=='self'){
-				return this.agent.act(this.act,this.value);
-			} else if (this.target=='world'){
-				return this.agent.world.act(this.act,this.value);
-			} else {
-				var t = this.traverse(this.agent, this.target);
-				if(t!=null && (t instanceof Object && !(t instanceof Array))){
-					return t.act(this.act,this.value);
-				}
-				return false;
+			var t = this.traverse(this.agent, this.target);
+			if(t!=null && (t instanceof Object && !(t instanceof Array))){
+				return t.act(this.act,this.value);
 			}
+			return false;
 		}
 	}
 
@@ -61,5 +55,3 @@ class Action extends Composite {
 	}
 
 }
-
-module.exports = Action;

@@ -1,5 +1,3 @@
-var Composite = request('./composite.js').Composite;
-
 class Decorator extends Composite{
 
 	init(args){
@@ -9,7 +7,7 @@ class Decorator extends Composite{
 		this.result = args.result || null;
 		this.filter = args.filter || null;
 		this.child = null;
-		setChildren(args);
+		this.setChildren(args);
 	}
 
 	setChildren(behavior){
@@ -33,8 +31,8 @@ class Decorator extends Composite{
 
 	add(behavior){
 		var child = behavior;
-		if(!(behavior instanceof Behavior)){
-			child = this.behaviorConstructor(behavior);
+		if(!(behavior instanceof Node)){
+			child = this.nodeConstructor(behavior);
 		}
 		child.setAgent(this.agent);
 		this.child = child;
@@ -44,11 +42,12 @@ class Decorator extends Composite{
 	//arrumar
 	traverse(obj,filter){
 		var fk = Object.keys(filter);
-		if(obj[fk[0]]!=null){
-			if(obj[fk[0]] instanceof Object && !(obj[fk[0]] instanceof Array)){
-				return this.traverse(obj[fk[0]],filter[fk[0]]);
+		var val = obj[fk[0]][filter[fk[0]]];
+		if(val!=null){
+			if(val instanceof Object && !(val instanceof Array)){
+				return this.traverse(val,filter[fk[0]]);
 			} else {
-				return obj[fk[0]];
+				return val;
 			}
 		}
 		return null;
@@ -93,8 +92,8 @@ class Decorator extends Composite{
 	json(){
 		var js = super.json();
 		js.child = this.child.json();
-		js.filter = JSON.stringify(this.filter);
-		js.result = JSON.stringify(this.result);
+		js.filter = this.filter;
+		js.result = this.result;
 		return js;
 	}
 
@@ -108,9 +107,25 @@ class Inverter extends Decorator{
 		this.type="inverter";
 	}
 
-	//ajeitar next e afins
+	success(stack){
+		stack.pop();
+		stack.last().node.fail(stack);
+		return this;
+	}
+
+	fail(stack){
+		stack.pop();
+		stack.last().node.success(stack);
+		return this;
+	}
+
+	next(stack){
+		stack.push(this.child);
+		return this;
+	}
 
 	run(){
+
 		if(this.child==null){
 			return false;
 		}
@@ -130,9 +145,6 @@ class Limit extends Decorator{
 	}
 
 	testCondition(){
-		if(this.child==null){
-			return false;
-		}
 		if(this.runs>=this.max){
 			return false;
 		}
@@ -190,38 +202,20 @@ class Condition extends Decorator{
 	//{res/prop:?, op:'==', val/res/prop:?}
 	init(args){
 		super.init(args);
-		this.type = 'test';
+		this.type = 'condition';
 	}
 
 	testCondition(){
-		var v1 = this.traverse(this.agent,{Object.keys(this.filter)[0]:this.filter[Object.keys(this.filter)[0]]});
-		var v2 = this.filter.val || this.traverse(this.agent,{Object.keys(this.filter)[2]:this.filter[Object.keys(this.filter)[2]]});
+		var obj = this.agent;
+		var k1 = Object.keys(this.filter)[0];
+		var k2 = Object.keys(this.filter)[2];
+		var v1 = this.traverse(this.agent,{[k1] : this.filter[ Object.keys(this.filter)[0] ]});
+		var v2 = this.filter.val || this.traverse(this.agent,{[k2]: this.filter[Object.keys(this.filter)[2]]});
 
 		if(this.op[this.filter.op](v1,v2) && this.child!=null){
 			return true;
 		}
 		return false;
-	}
-
-	fail(stack){
-		stack.pop();
-		stack.last().node.fail(stack);
-		return this;
-	}
-
-	success(stack){
-		stack.pop();
-		stack.last().node.success(stack);
-		return this;
-	}
-
-	next(stack){
-		if(this.testCondition()){
-			stack.push(this.child);
-		} else {
-			this.fail(stack);
-		}
-		return this;
 	}
 
 }
@@ -257,11 +251,151 @@ class Count extends Decorator {
 
 }
 
-module.exports = {
-	'Decorator'	: Decorator,
-	'Inverter'	: Inverter,
-	'Limit'			: Limit,
-	'Condition'	: Condition,
-	'Find'			: Find,
-	'Count'			: Count
+class Succeeder extends Decorator {
+
+	fail(stack){
+		return this.success(stack);
+	}
+
+	success(stack){
+		stack.pop();
+		stack.last().node.success(stack);
+		return this;
+	}
+
+	next(stack){
+		stack.push(this.child);
+		return this;
+	}
+
+	run(){
+		this.child.run();
+		return true;
+	}
+}
+
+class Failer extends Decorator {
+
+	fail(stack){
+		stack.pop();
+		stack.last().node.fail(stack);
+		return this;
+	}
+
+	success(stack){
+		return this.fail(stack);
+	}
+
+	next(stack){
+		stack.push(this.child);
+		return this;
+	}
+
+	run(){
+		this.child.run();
+		return false;
+	}
+
+}
+
+
+class Repeater extends Decorator {
+
+	init(args){
+		this.max = args.max;
+		this.runs = 0;
+	}
+
+	fail(stack){
+		if(this.max && this.runs<=this.max){
+			this.runs = 0;
+			stack.pop();
+			stack.last().node.fail(stack);
+		}
+	}
+
+	success(stack){
+		if(this.max && this.runs<=this.max){
+			this.runs = 0;
+			stack.pop();
+			stack.last().node.success(stack);
+		}
+	}
+
+
+	next(stack){
+		if(!this.max){
+			stack.push(this.child);
+		} else if (this.runs<=this.max){
+			stack.push(this.child);
+			this.runs++;
+		}
+		return this;
+	}
+
+	run(){
+		if(this.child==null){
+			return false;
+		}
+		if(!this.max){
+			this.child.run();
+		} else {
+			if(this.runs<this.max){
+				this.child.run();
+				this.runs++;
+			} else {
+				this.runs = 0;
+				return this.child.run();
+			}
+		}
+	}
+
+}
+
+class RepeatUntilSucceeds extends Decorator {
+
+	success(stack){
+		stack.pop();
+		stack.last().node.success(stack);
+		return this;
+	}
+
+	fail(stack){
+		return this;
+	}
+
+	next(stack){
+		stack.push(this.child);
+		return this;
+	}
+
+	run(){
+		if(this.child.run()){
+			return true;
+		}
+	}
+}
+
+class RepeatUntilFail extends Decorator {
+
+	fail(stack){
+		stack.pop();
+		stack.last().node.fail(stack);
+		return this;
+	}
+
+	success(stack){
+		return this;
+	}
+
+	next(stack){
+		stack.push(this.child);
+		return this;
+	}
+
+	run(){
+		if(!this.child.run()){
+			return false;
+		}
+	}
 }

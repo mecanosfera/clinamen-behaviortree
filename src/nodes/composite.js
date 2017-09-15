@@ -1,5 +1,3 @@
-var Node = require('./node.js');
-
 class Composite extends Node{
 
 	init(args){
@@ -36,12 +34,12 @@ class Composite extends Node{
 	add(behavior){
 		var child = behavior;
 		if(!(behavior instanceof Composite)){
-			child = this.behaviorConstructor(behavior);
+			child = this.nodeConstructor(behavior);
 		}
 		child.setAgent(this.agent);
 		this.children.push(child);
+		return this;
 	}
-	return this;
 
 }
 
@@ -54,11 +52,12 @@ class Selector extends Composite{
 	}
 
 	fail(stack){
-		stack.last().index++;
+		//stack.last().index++;
 		return this;
 	}
 
 	success(stack){
+		stack.last().index = 0;
 		stack.pop();
 		if(stack.length>0){
 			stack.last().node.success(stack);
@@ -84,39 +83,16 @@ class Selector extends Composite{
 		return this;
 	}
 
-	run(callstack){
-		if(callstack){
-			if(this.children.length>0){
-				if(callstack.length==0){
-					callstack.push({index:0, node: this});
-				}
-				var index = callstack[callstack.length-1].index;
-				while(index<this.children.length){
-					callstack.push({index:0,node:this.children[index]});
-					callstack[callstack.length-2].index++;
-					var res = callstack[callstack.length-2].node.run(callstack);
-					if(res.end){
-						return {end:true,stack:callstack};
-					}
-					if(res.value){
-						callstack.pop();
-						return {end:false,value:true}
-					}
-				}
-				return {end:false, value:false};
-			}
-		} else {
-			for(let c of this.children){
-				if(c.run(iterator)){
-					return true;
-				}
+	run(){
+
+		for(let c of this.children){
+			if(c.run()){
+				return true;
 			}
 		}
 		return false;
 	}
-
 }
-
 
 class Sequence extends Composite{
 
@@ -126,7 +102,7 @@ class Sequence extends Composite{
 	}
 
 	success(stack){
-		stack.last().index++;
+		//stack.last().index++;
 		return this;
 	}
 
@@ -142,12 +118,11 @@ class Sequence extends Composite{
 		if(!stack){
 			stack = this.stack;
 		}
-		//colocar no repeater também
 		if(stack.done){
 			stack.done = false;
 		}
-		var index = stack.last().index;
 		var previous = stack.last();
+		var index = previous.index;
 		if(index<this.children.length){
 			stack.push(this.children[index]);
 			previous.index++;
@@ -160,39 +135,14 @@ class Sequence extends Composite{
 		return this;
 	}
 
-	run(callstack){
-		if(callstack){
-			if(this.children.length>0){
-				if(callstack.length==0){
-					callstack.push({index:0, node: this});
-				}
-				var index = callstack[callstack.length-1].index;
-				while(index<this.children.length){
-					callstack.push({index:0,node:this.children[index]});
-					callstack[callstack.length-2].index++;
-					var res = callstack[callstack.length-2].node.run(callstack);
-					if(res.end){
-						return {end:true,stack:res.stack};
-					}
-					if(res.value){
-						callstack.pop();
-						return {end: true, stack:callstack};
-					}
-					if(!res.value){
-						callstack.pop();
-						return {end:false,value:true}
-					}
-				}
-				return {end:false, value:true};
+	run(){
+		console.log(this.children.length);
+		for(let c of this.children){
+			if(!c.run()){
+				return false;
 			}
-		} else {
-			for(let c of this.children){
-				if(!c.run(iterator)){
-					return false;
-				}
-			}
-			return true;
 		}
+		return true;
 	}
 }
 
@@ -204,10 +154,10 @@ class RandomSelector extends Composite {
 		this.type="randomSelector";
 	}
 
-	run(iterator=false){
+	run(){
 		var rchildren = this.shuffle(this.children);
 		for(let c of rchildren){
-			if(c.run(iterator)){
+			if(c.run()){
 				return true;
 			}
 		}
@@ -223,10 +173,10 @@ class RandomSequence extends Composite {
 		this.type="randomSequence";
 	}
 
-	run(iterator=false){
+	run(){
 		var rchildren = this.shuffle(this.children);
 		for(let c of rchildren){
-			if(!c.run(iterator)){
+			if(!c.run()){
 				return false;
 			}
 		}
@@ -234,11 +184,3 @@ class RandomSequence extends Composite {
 	}
 
 }
-
-module.exports = {
-	'Composite'			 : Composite,
-	'Selector'			 : Selector,
-	'Sequence'			 : Sequence,
-	'RandomSelector' : RandomSelector,
-	'RandomSequence' : RandomSequence
-};

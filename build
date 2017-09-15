@@ -1,4 +1,4 @@
 #!/bin/bash
-rm -rf dist
-browserify index.js > dist/index.js
 
+concat -o ./src/nodes.js ./src/nodes/node.js ./src/nodes/world.js ./src/nodes/agent.js  ./src/nodes/composite.js ./src/nodes/decorator.js ./src/nodes/action.js ./src/nodes/export.js  
+browserify index.js --s clinamenbt > ./dist/clinamen-bt.js
