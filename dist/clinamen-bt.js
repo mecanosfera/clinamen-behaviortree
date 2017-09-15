@@ -13,7 +13,6 @@ class Node {
     this.type ='node';
     this.name = args.name;
     this.temp = args.temp || true;
-    this.res = {};
     this.prop = {};
     this.children = [];
 
@@ -588,17 +587,17 @@ class Decorator extends Composite{
 		return this;
 	}
 
-	add(behavior){
-		var child = behavior;
-		if(!(behavior instanceof Node)){
-			child = this.nodeConstructor(behavior);
+	add(node){
+		var child = node;
+		if(!(node instanceof Node)){
+			child = this.nodeConstructor(node);
 		}
 		child.setAgent(this.agent);
 		this.child = child;
 		return this;
 	}
 
-	//arrumar
+
 	traverse(obj,filter){
 		var fk = Object.keys(filter);
 		var val = obj[fk[0]][filter[fk[0]]];
@@ -732,7 +731,7 @@ class Find extends Decorator{
 
 		testCondition(){
 			if(this.agent.temp && this.result!=null){
-				this.agent.res[this.result] = null;
+				this.agent.prop[this.result] = null;
 			}
 			var res = null;
 			if(this.scope=='world'){
@@ -741,7 +740,7 @@ class Find extends Decorator{
 				res = this.agent.find(this.filter);
 			}
 			if(this.result!=null){
-				this.agent.res[this.result] = res;
+				this.agent.prop[this.result] = res;
 			}
 			if(res!=null && this.child!=null){
 				return true;
@@ -788,9 +787,9 @@ class Count extends Decorator {
 		this.type = "count";
 	}
 
-	run(iterator=false){
+	run(){
 		if(this.agent.temp && this.result!=null){
-			this.agent.res[this.result] = null;
+			this.agent.prop[this.result] = null;
 		}
 
 		var c = null;

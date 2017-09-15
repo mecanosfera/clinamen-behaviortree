@@ -9,7 +9,6 @@ class Node {
     this.type ='node';
     this.name = args.name;
     this.temp = args.temp || true;
-    this.res = {};
     this.prop = {};
     this.children = [];
 
