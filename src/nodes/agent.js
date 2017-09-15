@@ -1,11 +1,11 @@
-class Agent extends Entity{
+class Agent extends Node {
 
 	init(args){
 		super.init(args);
 		this.mainType = 'agent';
 		this.type = args.type || 'agent';
 		this.template = args.template || this.type;
-		this.world = args.world || null;
+		this.world = args.world;
 
 		if(args.children!=null){
 			for(let c of args.children){
@@ -14,14 +14,19 @@ class Agent extends Entity{
 		}
 	}
 
-	add(behavior){
-		if(behavior instanceof Behavior){
-			this.children.push(behavior);
-		} else {
-			this.children.push(this.behaviorConstructor(behavior));
+	add(node){
+		if(this.children.length==0){
+			if(node instanceof Composite){
+				this.children.push(node);
+			} else {
+				this.children.push(this.nodeConstructor(node));
+			}
+			this.children[0].setAgent(this);
 		}
-		this.children[0].setAgent(this);
+		return this;
 	}
+
+
 
 	find(filter){
 		return this.world.find(filter);
@@ -60,19 +65,27 @@ class Agent extends Entity{
 		return true;
 	}
 
+	next(){
+		if(this.stack.length==0){
+			this.stack.push(this.children[0]);
+		} else {
+			this.stack.last().node.next(this.stack);
+		}
+		return this;
+	}
 
-	run(iterator=false){
+	run(){
 		if(this.temp){
 			this.res = {};
 		}
 		if(this.children.length>0){
-			return this.children[0].run(iterator);
+			return this.children[0].run();
 		}
 		return false;
 	}
 
-	toJson(){
-		var js = super.toJson();
+	json(){
+		var js = super.json();
 		js.template = this.template;
 		return js;
 	}

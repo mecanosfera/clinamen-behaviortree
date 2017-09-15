@@ -1,0 +1,22 @@
+module.exports = {
+	'Node'					 			: Node,
+	'World'					 			: World,
+	'Agent'					 			: Agent,
+	'Composite'			 			: Composite,
+	'Selector'			 			: Selector,
+	'Sequence'			 			: Sequence,
+	'RandomSelector' 			: RandomSelector,
+	'RandomSequence' 			: RandomSequence,
+	'Decorator'			 			: Decorator,
+	'Inverter'			 			: Inverter,
+	'Limit'					 			: Limit,
+	'Condition'			 			: Condition,
+	'Find'					 			: Find,
+	'Count'					 			: Count,
+	'Succeeder'						: Succeeder,
+	'Failer'							: Failer,
+	'Repeater'						: Repeater,
+	'RepeatUntilSucceeds'	: RepeatUntilSucceeds,
+	'RepeatUntilFail'			: RepeatUntilFail,
+	'Action'				 			: Action
+};

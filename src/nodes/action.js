@@ -1,4 +1,4 @@
-class Action extends Behavior{
+class Action extends Composite {
 
 	init(args){
 		super.init(args);
@@ -10,15 +10,28 @@ class Action extends Behavior{
 		this.value = args.value || null ;
 	}
 
-	setChildren(behavior){
+	setChildren(node){
 		this.children = null;
+		return this;
 	}
 
-	add(behavior){
-		return false;
+	add(node){
+		return this;
 	}
 
-	run(iterator = false){
+	next(stack){
+		stack.pop();
+		if(this.run()){
+			stack.done = true;
+			stack.last().node.success(stack);
+		} else {
+			stack.last().node.fail(stack);
+		}
+		return this;
+	}
+
+
+	run(){
 		if(this.target=='self'){
 			return this.agent.act(this.act,this.value);
 		} else if (this.target=='world'){
@@ -30,6 +43,15 @@ class Action extends Behavior{
 			}
 			return false;
 		}
+	}
+
+	json(){
+		var js = super.json();
+		js.target = this.target;
+		js.filter = this.filter;
+		js.act = this.act;
+		js.value = this.value;
+		return js;
 	}
 
 }

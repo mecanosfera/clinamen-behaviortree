@@ -1,4 +1,4 @@
-class World extends Entity{
+class World extends Node{
 
   init(args){
       super.init(args);
@@ -7,6 +7,7 @@ class World extends Entity{
       this.instances = [];
       this.templates = {};
       this.children = [];
+      this.started = false;
 
       if(args.instances!=null){
           for(let i of args.instances){
@@ -25,43 +26,64 @@ class World extends Entity{
   start(){
     if(this.children.length==0){
       for(let a of this.instances){
-        var ag = new Agent(this.templates[a.template]);
-        if(a.name!=null){
-          ag.name = a.name;
-        } else {
-          ag.name = a.template;
-        }
-        ag.template = a.template;
-        ag.world = this;
-        if(a.prop!=null){
-          ag.prop = a.prop;
-        }
-        this.children.push(ag);
+        this.startInstance(a);
+      }
+      this.started=true;
+    }
+    return this;
+  }
+
+  startInstance(instance){
+    if(this.templates[instance.template]){
+      var ag = new Agent(this.templates[instance.template]);
+      ag.name = instance.name || instance.template;
+      ag.template = instance.template;
+      ag.world = this;
+      if(instance.prop){
+        ag.prop = instance.prop;
+      }
+      this.children.push(ag);
+    }
+    return this;
+  }
+
+  add(args){
+    if(args.template){
+      this.templates[args.template[name]] = args.template;
+    }
+    if(args.instance){
+      this.instances.push(args.instance);
+      if(this.started){
+        this.setInstance(args.instance);
       }
     }
+    return this;
   }
 
-  remove(){
-
-  }
 
   run(iterator=false){
     for(let c of this.children){
       c.run(iterator);
     }
+    return true;
   }
 
   find(filter){
     if(filter=={}){
       return this.children;
     } else {
+      var r = [];
+      for(let c of this.children){
 
+      }
+      return r;
+      //implement
     }
   }
 
 
-  toJson(){
-    var js = super.toJson();
+  json(){
+    var js = super.json();
     js.instances = [];
     for(a of this.instances){
       var name = null;
@@ -81,7 +103,5 @@ class World extends Entity{
     return js;
 
   }
-
-
 
 }
