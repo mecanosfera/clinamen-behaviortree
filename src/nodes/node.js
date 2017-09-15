@@ -11,8 +11,6 @@ class Node {
     this.temp = args.temp || true;
     this.prop = {};
     this.children = [];
-
-    //console.log(args.prop);
     if(args.prop!=null){
 			for(let s in args.prop){
 				this.prop[s] = args.prop[s];
