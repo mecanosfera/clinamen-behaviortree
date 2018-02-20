@@ -1,0 +1,8 @@
+{
+	"compileOnSave": true,
+	"compilerOptions": {
+        "outDir": "./src/out/",
+        "allowJs": false,
+        "target": "es6"
+    }
+}

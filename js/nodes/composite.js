@@ -22,6 +22,7 @@ class Composite extends Node{
 	setAgent(agent){
 		if(agent!=null){
 			this.agent = agent;
+			this.agent.childrenIndex[this.name] = this;
 			if(this.children!=null){
 				for(let c of this.children){
 					c.setAgent(agent);

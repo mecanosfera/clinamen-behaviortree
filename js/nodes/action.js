@@ -34,15 +34,15 @@ class Action extends Composite {
 	run(){
 		if(this.target=='self'){
 			return this.agent.act(this.act,this.value);
-		} else if (this.target=='world'){
-			return this.agent.world.act(this.act,this.value);
-		} else {
-			var t = this.traverse(this.agent, this.target);
-			if(t!=null && (t instanceof Object && !(t instanceof Array))){
-				return t.act(this.act,this.value);
-			}
-			return false;
 		}
+		if (this.target=='world'){
+			return this.agent.world.act(this.act,this.value);
+		}
+		var t = this.traverse(this.agent, this.target);
+		if(t!=null && (t instanceof Object && !(t instanceof Array))){
+			return t.act(this.act,this.value);
+		}
+		return false;
 	}
 
 	json(){

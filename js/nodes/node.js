@@ -120,6 +120,7 @@ class Node {
     return false;
   }
 
+
   json(){
     var js = {
 			type: this.type,

@@ -6,6 +6,7 @@ class Agent extends Node {
 		this.type = args.type || 'agent';
 		this.template = args.template || this.type;
 		this.world = args.world;
+		this.childrenIndex = {};
 
 		if(args.children!=null){
 			for(let c of args.children){

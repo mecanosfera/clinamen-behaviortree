@@ -99,6 +99,45 @@ class Decorator extends Composite{
 
 }
 
+class Jump extends Decorator{
+
+		init(args){
+			super.init(args);
+			this.type="jump";
+			this.childName = args.childName;
+		}
+
+		add(node){
+			if(node.type){
+				if(!node.name || !agent.childrenIndex[node.name]){
+					return this;
+				}
+				this.childName = node.name;
+				return this;
+			}
+			if(!node.childName || !agent.childrenIndex[node.childName]){
+				return this;
+			}
+			this.childName = node.childName;
+			return this;
+		}
+
+		find(nodeName){
+			if(this.agent.childrenIndex[nodeName]){
+				this.child = this.agent.childrenIndex[nodeName];
+				return true;
+			}
+			return false;
+		}
+
+		run(){
+			if(!this.child || !find(this.childName)){
+				return false;
+			}
+			return this.child.run();
+		}
+}
+
 
 class Inverter extends Decorator{
 
