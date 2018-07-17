@@ -5,7 +5,6 @@ var clinamen;
         constructor(data) {
             super(data);
             this.children = [];
-            this.index = 0;
             this.mainType = 'composite';
             this.type = 'composite';
             this.agent = data.agent || null;
@@ -22,7 +21,7 @@ var clinamen;
         setAgent(agent) {
             if (agent != null) {
                 this.agent = agent;
-                this.agent.childrenIndex[this.id] = this;
+                this.agent.childrenIndex[this._id] = this;
                 if (this.children != null) {
                     for (let c of this.children) {
                         c.setAgent(agent);
@@ -39,18 +38,6 @@ var clinamen;
             child.setAgent(this.agent);
             this.children.push(child);
             return this;
-        }
-        success(stack) {
-            stack.state = clinamen.SUCCESS;
-            stack.pop();
-            this.index = 0;
-            return clinamen.SUCCESS;
-        }
-        failure(stack) {
-            stack.state = clinamen.FAILURE;
-            stack.pop();
-            this.index = 0;
-            return clinamen.FAILURE;
         }
     }
     clinamen.Composite = Composite;

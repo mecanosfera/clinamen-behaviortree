@@ -3,17 +3,15 @@
 namespace clinamen {
 
 	export class Agent extends Node {
-		template: string;
 		world: World;
-		childrenIndex: Dict<string>;
+		childrenIndex: Dict<Composite> = {};
+		nameIndex: Dict<Composite> = {};
 		//children: Array<Composite> = [];
 
 		constructor(data){
 			super(data);
 			this.mainType = 'agent';
 			this.type = data.type || 'agent';
-			this.world = data.world;
-			this.childrenIndex = {};
 			if(data.children!=null){
 				for(let c of data.children){
 					this.add(c);
@@ -22,13 +20,16 @@ namespace clinamen {
 		}
 
 		add(node:Composite):Node{
-			if(this.children.length==0){
-				if(node instanceof Composite){
-					this.children.push(node);
-				} else {
-					this.children.push(this.nodeConstructor(node));
-				}
-				(this.children[0] as Composite).setAgent(this);
+			var child:Composite;
+			if(node instanceof Composite){
+				child = node;
+			} else {
+				child = this.nodeConstructor(node);
+			}
+			this.children.push(child);
+			this.childrenIndex[child._id] = child;
+			if(child.name!=child.type){
+				this.nameIndex[child.name] = child;
 			}
 			return this;
 		}
@@ -47,11 +48,9 @@ namespace clinamen {
 
 
 		act(action:string,value:any):number{
-			this.stack.state = RUNNING;
 			if(this[action]){
 				return this[action](value);
 			}
-			this.stack.state = FAILURE;
 			return FAILURE;
 		}
 
@@ -60,13 +59,25 @@ namespace clinamen {
 		}
 
 		tick(stack:Stack):number{
-			if(stack.length==0){
-				return stack.state;
+			if(this.children.length==0){
+				return FAILURE;
+			}
+			if(stack.length==0 && stack.state!==IDLE){
+				var state:number = stack.state;
+				stack.state = IDLE;
+				return state;
+			}
+			if(stack.length==0 && stack.state===IDLE){
+				stack.push(this.children[0]);
 			}
 			var last:Node = stack.last();
-			var res = last.next(stack);
-			//if(last.type=='action' && )
-			//var res:number = stack.last().next(stack);
+			var res:number = last.next(stack);
+			if(last.type=='action'){
+				if(res===SUCCESS || res===RUNNING){
+					return res;
+				}
+			}
+			return this.tick(stack);
 		}
 
 
@@ -75,23 +86,34 @@ namespace clinamen {
 		//{prop:['teste','prop'],val}
 		//{prop:'teste',val:15}
 		//{prop:[['teste','teste2'],'g'],val:16}
-		change(val):number{
-			var prop = this.prop;
-			var propName = val.prop;
-			if(val.prop instanceof Array){
-					var ob = this.prop;
-					for(let p of val.prop[0]){
-						if(!ob[p]){
-		//					ob[p] = {};
-						}
-			//			ob = ob[p];
-					}
-					prop = ob;
-					propName = val.prop[1];
+		//mudar prop ou outras coisas?
+		change(filter:Filter):number{
+			if(!filter.create && !this.prop[filter.prop]){
+				return FAILURE;
 			}
-			prop[propName] = val.val;
-
-			this.stack.state = SUCCESS;
+			if(!filter.op){
+				this.prop[filter.prop] = filter.val;
+				return SUCCESS;
+			}
+			if(!this.prop[filter.prop]){
+				this.prop[filter.prop] = 0;
+			}
+			if(filter.op==='+'){
+				this.prop[filter.prop] += filter.val;
+				return SUCCESS;
+			}
+			if(filter.op==='-'){
+				this.prop[filter.prop] -= filter.val as number;
+				return SUCCESS;
+			}
+			if(filter.op==='*'){
+				this.prop[filter.prop] *= filter.val as number;
+				return SUCCESS;
+			}
+			if(filter.op==='/'){
+				this.prop[filter.prop] /= filter.val as number;
+				return SUCCESS;
+			}
 			return SUCCESS;
 		}
 
@@ -114,13 +136,12 @@ namespace clinamen {
 		}
 
 
-		copy():Agent{
-			return super.copy() as Agent;
+		copy(data:JsonData):Agent{
+			return super.copy(data) as Agent;
 		}
 
 		json(children:boolean=true):JsonData{
-			var js:JsonData = super.json();
-			js.template = this.template;
+			var js:JsonData = super.json(children);
 			return js;
 		}
 	}

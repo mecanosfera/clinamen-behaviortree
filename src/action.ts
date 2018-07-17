@@ -10,8 +10,7 @@ namespace clinamen {
 	export class Action extends Composite {
 		target: string;
 		act: string;
-		value: ActionValue;
-		waitingReponse: boolean = false;
+		value: Filter;
 
 		constructor(data){
 			super(data);
@@ -19,7 +18,7 @@ namespace clinamen {
 			this.type = data.type || 'action';
 			this.target = data.target || 'self';
 			this.act = data.act || 'wait';
-			this.value = data.value || null ;
+			this.value = data.value || {} ;
 		}
 
 		setChildren(node:Node):Node{
@@ -32,27 +31,19 @@ namespace clinamen {
 		}
 
 		next(stack:Stack):number{
-			if(stack.state!==RUNNING){
-				stack.pop();
-				this.waitingReponse = false;
-				return stack.state;
+			var res:number;
+			if(!this.target){
+				res = this.agent.act(this.act,this.value);
+			} else if (this.agent.world.agentIndex[this.target]){
+				res = this.agent.world.agentIndex[this.target].act(this.act,this.value);
+			} else {
+				res = FAILURE;
 			}
-			var res:number = this.agent.act(this.act,this.value);
-
-			if(!this.waitingReponse){
-				this.waitingReponse = true;
-				if(this.target=='self'){
-					this.agent.act(this.act,this.value);
-				} else if(this.target=='world'){
-					this.agent.world.act(this.act,this.value);
-				} else {
-					if(!this.agent.world.agentIndex[this.target]){
-						stack.state = FAILURE;
-						stack.pop();
-						return FAILURE;
-					}
-					this.agent.world.agentIndex[this.target].act(this.act,this.value);
-				}
+			if(res===FAILURE){
+				return this.failure(stack);
+			}
+			if(res===SUCCESS){
+				return this.success(stack);
 			}
 			stack.state = RUNNING;
 			return RUNNING;
@@ -75,8 +66,15 @@ namespace clinamen {
 			return this.agent.world.agentIndex[this.target].act(this.act,this.value);*/
 		}
 
-		copy():Action {
-			return super.copy() as Action;
+		copy(data:JsonData):Action {
+			return super.copy(data) as Action;
+		}
+
+		copyJson(data:JsonData):JsonData{
+			var js = this.json(false);
+			js._id = this.uuid();
+			js.name = data.name || js.name;
+			return js;
 		}
 
 		json(children:boolean=true):JsonData{

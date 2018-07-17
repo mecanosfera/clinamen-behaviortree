@@ -16,9 +16,9 @@ var clinamen;
             this.mainType = 'node';
             this.type = 'node';
             this.prop = {};
-            this.running = false;
             this.children = [];
             this.stack = new Stack();
+            this.index = 0;
             this.op = {
                 "+": (a, b) => { return a + b; },
                 "-": (a, b) => { return a - b; },
@@ -34,11 +34,12 @@ var clinamen;
                 "<": (a, b) => { return a < b; },
                 "<=": (a, b) => { return a <= b; },
                 "&&": (a, b) => { return a && b; },
-                "||": (a, b) => { return a || b; }
+                "||": (a, b) => { return a || b; },
+                "?": (a, b, c) => { return a ? b : c; }
             };
             this.mainType = 'node';
             this.type = 'node';
-            this._id = data._id;
+            this._id = data._id || this.uuid();
             this.name = data.name;
             if (data.prop != null) {
                 for (let s in data.prop) {
@@ -50,22 +51,21 @@ var clinamen;
         filterEval(obj, filter) {
             var propVal;
             //['prop1','prop2','prop3'] = {prop1:{prop2:{prop3:val}}}
-            if (filter.prop instanceof Array) {
-                var pval = obj;
-                for (let p of filter.prop) {
-                    if (!pval[p]) {
-                        return false;
-                    }
-                    pval = pval[p];
+            /*if(filter.prop instanceof Array){
+              var pval = obj;
+              for(let p of filter.prop){
+                if(!pval[p]){
+                  return false;
                 }
-                propVal = pval;
+                pval = pval[p];
+              }
+              propVal = pval;
+            } else {*/
+            if (!obj[filter.prop]) {
+                return false;
             }
-            else {
-                if (!obj[filter.prop]) {
-                    return false;
-                }
-                propVal = obj[filter.prop];
-            }
+            propVal = obj[filter.prop];
+            //}
             //if(filter.val instanceof Object){
             //  return this.op[filter.op](propVal,this.filterEval(obj,(filter as Filter).val));
             //}
@@ -146,52 +146,52 @@ var clinamen;
                 this.children = [];
                 return this;
             }
-            let toRemove = [];
-            for (let i = 0; i < this.children.length; i++) {
+            for (let i = this.children.length - 1; i > -1; i--) {
+                if (this.children.length == 0) {
+                    return this;
+                }
                 if (this.filterEval(this.children[i], filter)) {
-                    toRemove.push(i);
+                    if (this['agent'] && this['agent'] != null) {
+                        var agent = this['agent'].removeChildIndex(this.children[i]._id);
+                    }
+                    this.children.splice(i, 1);
                 }
-            }
-            while (toRemove.length) {
-                let i = toRemove.pop();
-                if (this['agent'] && this['agent'] != null) {
-                    var agent = this['agent'].removeChildIndex(this.children[i]._id);
-                }
-                this.children.splice(i, 1);
             }
             return this;
         }
         next(stack = null) {
             return clinamen.FAILURE;
         }
-        tick(stack) {
-            if (stack.length == 0) {
-                return clinamen.FAILURE;
-            }
-            var state = this.next(stack);
-            if (stack.state === clinamen.RUNNING) {
-                return stack.last().tick(stack);
-            }
-            if (stack.state !== clinamen.RUNNING) {
-                stack.state = clinamen.RUNNING;
-            }
-            while (stack.state === clinamen.RUNNING) {
-            }
+        success(stack) {
+            stack.state = clinamen.SUCCESS;
+            stack.pop();
+            this.index = 0;
+            return clinamen.SUCCESS;
+        }
+        failure(stack) {
+            stack.state = clinamen.FAILURE;
+            stack.pop();
+            this.index = 0;
+            return clinamen.FAILURE;
+        }
+        running(stack) {
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
         }
         run() {
             return false;
         }
-        copy() {
-            return this.nodeConstructor(this.copyJson);
+        copy(data = {}) {
+            return this.nodeConstructor(this.copyJson(data));
         }
-        copyJson(name = null) {
-            var data = this.json(false);
-            data._id = null;
-            data.name = name || data.type;
+        copyJson(data = {}) {
+            var js = this.json(false);
+            js._id = this.uuid();
+            js.name = data.name || js.name;
             for (let c of this.children) {
-                data.push(c.copyJson());
+                js.push(c.copyJson());
             }
-            return data;
+            return js;
         }
         json(children = true) {
             var js = {
@@ -201,11 +201,9 @@ var clinamen;
                 prop: this.prop,
                 children: []
             };
-            if (children) {
-                if (this.children != null) {
-                    for (let c of this.children) {
-                        js.children.push(c.json());
-                    }
+            if (children && this.children != null) {
+                for (let c of this.children) {
+                    js.children.push(c.json());
                 }
             }
             return js;
@@ -232,8 +230,9 @@ var clinamen;
     class Stack {
         constructor() {
             this._stack = [];
+            this.state = clinamen.IDLE;
         }
-        push(node, root = false) {
+        push(node) {
             this._stack.push(node);
         }
         pop() {

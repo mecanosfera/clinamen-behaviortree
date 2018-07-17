@@ -6,7 +6,6 @@ namespace clinamen {
 
 		agent: Agent;
 		children: Array<Composite> = [];
-		index: number = 0;
 
 		constructor(data){
 			super(data);
@@ -28,7 +27,7 @@ namespace clinamen {
 		setAgent(agent: Agent){
 			if(agent!=null){
 				this.agent = agent;
-				this.agent.childrenIndex[this.id] = this;
+				this.agent.childrenIndex[this._id] = this;
 				if(this.children!=null){
 					for(let c of this.children){
 						c.setAgent(agent);
@@ -46,20 +45,6 @@ namespace clinamen {
 			child.setAgent(this.agent);
 			this.children.push(child);
 			return this;
-		}
-
-		success(stack:Stack):number{
-			stack.state = SUCCESS;
-			stack.pop();
-			this.index = 0;
-			return SUCCESS;
-		}
-
-		failure(stack:Stack):number {
-			stack.state = FAILURE;
-			stack.pop();
-			this.index = 0;
-			return FAILURE;
 		}
 
 	}

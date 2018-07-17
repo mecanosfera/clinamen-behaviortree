@@ -65,9 +65,18 @@ var clinamen;
             }
             return false;
         }
-        json() {
-            var js = super.json();
-            js.child = this.child.json();
+        copyJson(data) {
+            var js = this.json(false);
+            js._id = this.uuid();
+            js.name = data.name || js.name;
+            js.child = this.child ? this.child.copyJson() : null;
+            return js;
+        }
+        json(children = true) {
+            var js = super.json(false);
+            if (children) {
+                js.child = this.child.json();
+            }
             js.filter = this.filter;
             js.result = this.result;
             return js;
@@ -78,45 +87,25 @@ var clinamen;
         constructor(data) {
             super(data);
             this.type = "jump";
-            this.childName = data.childName;
+            this.childName = data.childName || null;
+        }
+        setChildren(data) {
+            this.child = null;
+            return this;
         }
         next(stack) {
-            if (!this.child || stack.state === clinamen.FAILURE) {
+            if (!this.childName || !this.agent.nameIndex[this.childName] || stack.state === clinamen.FAILURE) {
                 return this.failure(stack);
             }
             if (stack.state === clinamen.SUCCESS) {
                 return this.success(stack);
             }
             stack.state = clinamen.RUNNING;
-            stack.push(this.child);
+            stack.push(this.agent.nameIndex[this.childName]);
             return clinamen.RUNNING;
         }
-        add(node) {
-            if (node.type) {
-                if (!node.name || !this.agent.childrenIndex[node.name]) {
-                    return this;
-                }
-                this.childName = node.name;
-                return this;
-            }
-            if (!node.childName || !this.agent.childrenIndex[node.childName]) {
-                return this;
-            }
-            this.childName = node.childName;
-            return this;
-        }
-        find(nodeName) {
-            if (this.agent.childrenIndex[nodeName]) {
-                this.child = this.agent.childrenIndex[nodeName];
-                return true;
-            }
-            return false;
-        }
-        run() {
-            if (!this.child || !this.find(this.childName)) {
-                return false;
-            }
-            return this.child.run();
+        copy(data) {
+            return super.copy(data);
         }
     }
     clinamen.Jump = Jump;
@@ -125,8 +114,8 @@ var clinamen;
             super(data);
             this.type = "inverter";
         }
-        copy(name) {
-            return super.copy(name);
+        copy(data) {
+            return super.copy(data);
         }
         next(stack) {
             if (!this.child || stack.state === clinamen.SUCCESS) {
@@ -153,16 +142,22 @@ var clinamen;
             this.runs = 0;
             this.type = 'limit';
             this.max = data.max || 0;
+            this.reset = data.reset || false;
         }
         next(stack) {
             if (!this.child || this.runs >= this.max) {
-                this.runs = 0;
+                if (this.reset) {
+                    this.runs = 0;
+                }
                 return this.failure(stack);
             }
             stack.state = clinamen.RUNNING;
             stack.push(this.child);
             this.runs++;
             return clinamen.RUNNING;
+        }
+        copy(data) {
+            return super.copy(data);
         }
         json() {
             var js = super.json();
@@ -177,35 +172,46 @@ var clinamen;
         constructor(data) {
             super(data);
             this.type = "find";
-            this.scope = data.scope || 'world';
+            this.selector = data.selector || 'first';
+            this.test = data.test || null;
         }
         testCondition() {
             if (!this.result) {
                 return false;
             }
-            var res = null;
-            if (this.scope == 'world') {
-                res = this.agent.world.find(this.filter);
-            }
-            else {
-                res = this.agent.find(this.filter);
-            }
-            if (this.result != null) {
-                this.agent.prop[this.result] = res;
-            }
-            if (res != null && this.child != null) {
+            var res = [];
+            res = this.agent.world.find(this.filter, this.selector);
+            if (this.selector == 'all') {
+                this.agent.prop[this.result] = [];
+                for (let r of res) {
+                    this.agent.prop[this.result].push(r._id);
+                }
                 return true;
             }
+            var agent = null;
+            if (this.selector == 'first' && res.length > 0) {
+                agent = res[0];
+            }
+            if (this.selector == 'last' && res.length > 0) {
+                agent = res[res.length - 1];
+            }
+            if (this.selector == 'random' && res.length > 0) {
+                agent = res[0];
+            }
+            this.agent.prop[this.result] = agent;
+            return true;
         }
-        json() {
-            var js = super.json();
-            js.scope = this.scope;
+        copy(data) {
+            return super.copy(data);
+        }
+        json(children = false) {
+            var js = super.json(children);
+            js.selector = this.selector;
             return js;
         }
     }
     clinamen.Find = Find;
     class Condition extends Decorator {
-        //{res/prop:?, op:'==', val/res/prop:?}
         constructor(data) {
             super(data);
             this.type = 'condition';
@@ -214,11 +220,8 @@ var clinamen;
             if (!this.child) {
                 return false;
             }
-            var target = this.target || this.agent;
-            if (this.filterEval(this.target, this.filter)) {
-                return true;
-            }
-            return false;
+            var target = !this.target ? this.agent : this.agent.world.agentIndex[this.target._id];
+            return this.filterEval(target, this.filter);
         }
     }
     clinamen.Condition = Condition;
@@ -226,6 +229,8 @@ var clinamen;
         constructor(data) {
             super(data);
             this.type = "count";
+            this.test = data.test || null;
+            this.selector = data.selector || 'all';
         }
         next(stack) {
             if (!this.child || stack.state === clinamen.FAILURE) {
@@ -234,43 +239,38 @@ var clinamen;
             if (stack.state === clinamen.SUCCESS) {
                 return this.success(stack);
             }
+            if (!this.count()) {
+                return this.failure(stack);
+            }
             stack.state = clinamen.RUNNING;
             stack.push(this.child);
             return clinamen.RUNNING;
         }
         count() {
+            if (!this.result && !this.test) {
+                return false;
+            }
+            var res = this.agent.world.find(this.filter, this.selector).length;
+            if (this.result) {
+                this.agent.prop[this.result] = res;
+            }
+            if (this.test) {
+                return this.op[this.test.op](res, this.test.val);
+            }
+            return true;
         }
         run() {
-            var target = this.target || this.agent;
-            this.result = this.searchChildren(target, this.filter).length;
-            if (this.resultProp) {
-                this.agent.prop[this.resultProp] = this.result;
-            }
-            else {
-                if (!this.agent.prop[this.name]) {
-                    this.agent.prop[this.name] = { 'result': null };
-                }
-                this.agent.prop[this.name].result = this.result;
-            }
-            if (!this.child) {
-                return true;
-            }
-            return this.child.run();
+            return false;
         }
     }
     clinamen.Count = Count;
     class Succeeder extends Decorator {
-        fail(stack) {
+        next(stack) {
+            if (stack.state === clinamen.RUNNING) {
+                stack.push(this.child);
+                return clinamen.RUNNING;
+            }
             return this.success(stack);
-        }
-        success(stack) {
-            stack.pop();
-            stack.last().node.success(stack);
-            return this;
-        }
-        next_(stack) {
-            stack.push(this.child);
-            return this;
         }
         run() {
             this.child.run();
@@ -279,17 +279,12 @@ var clinamen;
     }
     clinamen.Succeeder = Succeeder;
     class Failer extends Decorator {
-        fail(stack) {
-            stack.pop();
-            stack.last().node.fail(stack);
-            return this;
-        }
-        success(stack) {
-            return this.fail(stack);
-        }
-        next_(stack) {
-            stack.push(this.child);
-            return this;
+        next(stack) {
+            if (stack.state === clinamen.RUNNING) {
+                stack.push(this.child);
+                return clinamen.RUNNING;
+            }
+            return this.failure(stack);
         }
         run() {
             this.child.run();
@@ -297,68 +292,23 @@ var clinamen;
         }
     }
     clinamen.Failer = Failer;
-    class Repeater extends Decorator {
+    class RepeatUntilSucceeds extends Decorator {
         constructor(data) {
             super(data);
-            this.runs = 0;
-            this.max = data.max;
+            this.type = "repeatuntilsucceeds";
         }
-        fail(stack) {
-            if (this.max && this.runs <= this.max) {
-                this.runs = 0;
-                stack.pop();
-                stack.last().node.fail(stack);
-            }
-            return this;
-        }
-        success(stack) {
-            if (this.max && this.runs <= this.max) {
-                this.runs = 0;
-                stack.pop();
-                stack.last().node.success(stack);
-            }
-            return this;
-        }
-        next_(stack) {
-            if (!this.max) {
-                stack.push(this.child);
-            }
-            else if (this.runs <= this.max) {
-                stack.push(this.child);
-                this.runs++;
-            }
-            return this;
-        }
-        run() {
+        next(stack) {
             if (!this.child) {
-                return false;
+                return this.failure(stack);
             }
-            if (!this.max) {
-                this.child.run();
+            if (stack.state === clinamen.SUCCESS) {
+                return this.success(stack);
             }
-            else {
-                this.runs++;
-                while (this.runs < this.max) {
-                    this.child.run();
-                }
-                this.runs = 0;
-                return this.child.run();
+            if (stack.last()._id != this.child._id) {
+                stack.push(this.child);
             }
-        }
-    }
-    clinamen.Repeater = Repeater;
-    class RepeatUntilSucceeds extends Decorator {
-        success(stack) {
-            stack.pop();
-            stack.last().node.success(stack);
-            return this;
-        }
-        fail(stack) {
-            return this;
-        }
-        next_(stack) {
-            stack.push(this.child);
-            return this;
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
         }
         run() {
             if (this.child.run()) {
@@ -368,22 +318,22 @@ var clinamen;
     }
     clinamen.RepeatUntilSucceeds = RepeatUntilSucceeds;
     class RepeatUntilFail extends Decorator {
-        fail(stack) {
-            stack.pop();
-            stack.last().node.fail(stack);
-            return this;
+        constructor(data) {
+            super(data);
+            this.type = "repeatuntilfails";
         }
-        success(stack) {
-            return this;
-        }
-        next_(stack) {
-            stack.push(this.child);
-            return this;
-        }
-        run() {
-            if (!this.child.run()) {
-                return false;
+        next(stack) {
+            if (!this.child) {
+                return this.failure(stack);
             }
+            if (stack.state === clinamen.FAILURE) {
+                return this.failure(stack);
+            }
+            if (stack.last()._id != this.child._id) {
+                stack.push(this.child);
+            }
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
         }
     }
     clinamen.RepeatUntilFail = RepeatUntilFail;

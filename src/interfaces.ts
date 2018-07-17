@@ -25,14 +25,15 @@ namespace clinamen {
   }
 
   export interface Prop{
-    [index:string]: boolean | string | number | Vector2;
+    [index:string]: any;
   }
 
   export interface Filter{
-    prop: string | Array<string>;
-    op: string;
+    prop: string;
+    op?: string;
     val: number | string | boolean | null | Vector2 | Filter;
-    mod: string;
+    mod?: string;
+    create?: boolean;
   }
 
 

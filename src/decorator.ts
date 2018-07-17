@@ -80,9 +80,19 @@ namespace clinamen {
 			return false;
 		}
 
-		json(){
-			var js = super.json();
-			js.child = this.child.json();
+		copyJson(data:JsonData):JsonData {
+			var js = this.json(false);
+			js._id = this.uuid();
+			js.name = data.name || js.name;
+			js.child = this.child ? this.child.copyJson() : null;
+			return js;
+		}
+
+		json(children:boolean = true):JsonData{
+			var js:JsonData = super.json(false);
+			if(children){
+				js.child = this.child.json();
+			}
 			js.filter = this.filter;
 			js.result = this.result;
 			return js;
@@ -97,50 +107,36 @@ namespace clinamen {
 			constructor(data){
 				super(data);
 				this.type="jump";
-				this.childName = data.childName;
+				this.childName = data.childName || null;
+			}
+
+			setChildren(data){
+				this.child = null;
+				return this;
 			}
 
 			next(stack:Stack):number{
-				if(!this.child || stack.state===FAILURE){
+				if(!this.childName || !this.agent.nameIndex[this.childName] || stack.state===FAILURE){
 					return this.failure(stack);
 				}
 				if(stack.state===SUCCESS){
 					return this.success(stack);
 				}
 				stack.state = RUNNING;
-				stack.push(this.child);
+				stack.push(this.agent.nameIndex[this.childName]);
 				return RUNNING;
 			}
 
-			add(node){
-				if(node.type){
-					if(!node.name || !this.agent.childrenIndex[node.name]){
-						return this;
-					}
-					this.childName = node.name;
-					return this;
-				}
-				if(!node.childName || !this.agent.childrenIndex[node.childName]){
-					return this;
-				}
-				this.childName = node.childName;
-				return this;
+			copy(data:JsonData):Jump{
+				return super.copy(data) as Jump;
 			}
 
-			find(nodeName){
-				if(this.agent.childrenIndex[nodeName]){
-					this.child = this.agent.childrenIndex[nodeName];
-					return true;
-				}
-				return false;
-			}
-
-			run(){
+			/*run(){
 				if(!this.child || !this.find(this.childName)){
 					return false;
 				}
 				return this.child.run();
-			}
+			}*/
 	}
 
 
@@ -151,8 +147,8 @@ namespace clinamen {
 			this.type="inverter";
 		}
 
-		copy(name:string):Inverter{
-			return super.copy(name) as Inverter;
+		copy(data:JsonData):Inverter{
+			return super.copy(data) as Inverter;
 		}
 
 		next(stack:Stack):number{
@@ -181,22 +177,30 @@ namespace clinamen {
 
 		max: number;
 		runs: number = 0;
+		reset:boolean;
 
 		constructor(data){
 			super(data);
 			this.type = 'limit';
 			this.max = data.max || 0;
+			this.reset = data.reset || false;
 		}
 
 		next(stack:Stack):number {
 			if(!this.child || this.runs>=this.max){
-				this.runs = 0;
+				if(this.reset){
+					this.runs = 0;
+				}
 				return this.failure(stack);
 			}
 			stack.state = RUNNING;
 			stack.push(this.child);
 			this.runs++;
 			return RUNNING;
+		}
+
+		copy(data:JsonData):Limit{
+			return super.copy(data) as Limit;
 		}
 
 
@@ -212,35 +216,50 @@ namespace clinamen {
 	//Finds another Agent id
 	export class Find extends Decorator{
 
-			scope: string;
+			selector:string; //'all','first','last','random'
+			test: Filter;
 
 			constructor(data){
 				super(data);
 				this.type="find";
-				this.scope = data.scope || 'world';
+				this.selector = data.selector || 'first';
+				this.test = data.test || null;
 			}
 
 			testCondition(){
 				if(!this.result){
 					return false;
 				}
-				var res = null;
-				if(this.scope=='world'){
-					res = this.agent.world.find(this.filter);
-				} else {
-					res = this.agent.find(this.filter);
-				}
-				if(this.result!=null){
-					this.agent.prop[this.result] = res;
-				}
-				if(res!=null && this.child!=null){
+				var res:Array<Agent> = [];
+				res = this.agent.world.find(this.filter,this.selector);
+				if(this.selector=='all'){
+					this.agent.prop[this.result] = [];
+					for(let r of res){
+						this.agent.prop[this.result].push(r._id);
+					}
 					return true;
 				}
+				var agent:Agent = null;
+				if(this.selector=='first' && res.length>0){
+					agent = res[0] as Agent;
+				}
+				if(this.selector=='last' && res.length>0){
+					agent = res[res.length-1] as Agent;
+				}
+				if(this.selector=='random' && res.length>0){
+					agent = res[0] as Agent;
+				}
+				this.agent.prop[this.result] = agent;
+				return true;
 			}
 
-			json(){
-				var js = super.json();
-				js.scope = this.scope;
+			copy(data:JsonData):Find{
+				return super.copy(data) as Find;
+			}
+
+			json(children:boolean = false):JsonData{
+				var js = super.json(children);
+				js.selector = this.selector;
 				return js;
 			}
 
@@ -248,7 +267,6 @@ namespace clinamen {
 
 	export class Condition extends Decorator{
 
-		//{res/prop:?, op:'==', val/res/prop:?}
 		constructor(data){
 			super(data);
 			this.type = 'condition';
@@ -258,11 +276,8 @@ namespace clinamen {
 			if(!this.child){
 				return false;
 			}
-			var target = this.target || this.agent;
-			if(this.filterEval(this.target,this.filter)){
-				return true;
-			}
-			return false;
+			var target:Agent = !this.target ? this.agent : this.agent.world.agentIndex[this.target._id];
+			return this.filterEval(target,this.filter);
 		}
 
 	}
@@ -270,9 +285,14 @@ namespace clinamen {
 
 	export class Count extends Decorator {
 
+		test: Filter;
+		selector: string;
+
 		constructor(data){
 			super(data);
 			this.type = "count";
+			this.test = data.test || null;
+			this.selector = data.selector || 'all';
 		}
 
 		next(stack:Stack):number{
@@ -282,49 +302,43 @@ namespace clinamen {
 			if(stack.state===SUCCESS){
 				return this.success(stack);
 			}
+			if(!this.count()){
+				return this.failure(stack);
+			}
 			stack.state = RUNNING;
 			stack.push(this.child);
 			return RUNNING;
 		}
 
-		count():void{
-
+		count():boolean{
+			if(!this.result && !this.test){
+				return false;
+			}
+			var res:number = this.agent.world.find(this.filter,this.selector).length;
+			if(this.result){
+				this.agent.prop[this.result] = res;
+			}
+			if(this.test){
+				return this.op[this.test.op](res,this.test.val);
+			}
+			return true;
 		}
 
 		run():boolean{
-			var target = this.target || this.agent;
-			this.result = this.searchChildren(target,this.filter).length;
-			if(this.resultProp){
-				this.agent.prop[this.resultProp] = this.result;
-			} else {
-				if(!this.agent.prop[this.name]){
-					this.agent.prop[this.name] = {'result':null};
-				}
-				this.agent.prop[this.name].result = this.result;
-			}
-			if(!this.child){
-				return true;
-			}
-			return this.child.run();
+
+			return false;
 		}
 
 	}
 
 	export class Succeeder extends Decorator {
 
-		fail(stack){
+		next(stack:Stack):number {
+			if(stack.state===RUNNING){
+				stack.push(this.child);
+				return RUNNING;
+			}
 			return this.success(stack);
-		}
-
-		success(stack){
-			stack.pop();
-			stack.last().node.success(stack);
-			return this;
-		}
-
-		next_(stack){
-			stack.push(this.child);
-			return this;
 		}
 
 		run(){
@@ -335,19 +349,12 @@ namespace clinamen {
 
 	export class Failer extends Decorator {
 
-		fail(stack){
-			stack.pop();
-			stack.last().node.fail(stack);
-			return this;
-		}
-
-		success(stack){
-			return this.fail(stack);
-		}
-
-		next_(stack){
-			stack.push(this.child);
-			return this;
+		next(stack:Stack):number {
+			if(stack.state===RUNNING){
+				stack.push(this.child);
+				return RUNNING;
+			}
+			return this.failure(stack);
 		}
 
 		run(){
@@ -358,78 +365,28 @@ namespace clinamen {
 	}
 
 
-	export class Repeater extends Decorator {
 
-		max:number;
-		runs:number = 0;
-
-		constructor(data){
-			super(data);
-			this.max = data.max;
-		}
-
-		fail(stack){
-			if(this.max && this.runs<=this.max){
-				this.runs = 0;
-				stack.pop();
-				stack.last().node.fail(stack);
-			}
-			return this;
-		}
-
-		success(stack){
-			if(this.max && this.runs<=this.max){
-				this.runs = 0;
-				stack.pop();
-				stack.last().node.success(stack);
-			}
-			return this;
-		}
-
-
-		next_(stack){
-			if(!this.max){
-				stack.push(this.child);
-			} else if (this.runs<=this.max){
-				stack.push(this.child);
-				this.runs++;
-			}
-			return this;
-		}
-
-		run(){
-			if(!this.child){
-				return false;
-			}
-			if(!this.max){
-				this.child.run();
-			} else {
-				this.runs++;
-				while(this.runs<this.max){
-					this.child.run();
-				}
-				this.runs = 0;
-				return this.child.run();
-			}
-		}
-
-	}
 
 	export class RepeatUntilSucceeds extends Decorator {
 
-		success(stack){
-			stack.pop();
-			stack.last().node.success(stack);
-			return this;
+		constructor(data:JsonData){
+			super(data);
+			this.type="repeatuntilsucceeds";
 		}
 
-		fail(stack){
-			return this;
-		}
+		next(stack:Stack):number{
+			if(!this.child){
+				return this.failure(stack);
+			}
+			if(stack.state===SUCCESS){
+				return this.success(stack);
+			}
+			if(stack.last()._id!=this.child._id){
+				stack.push(this.child);
+			}
+			stack.state = RUNNING;
+			return RUNNING;
 
-		next_(stack){
-			stack.push(this.child);
-			return this;
 		}
 
 		run(){
@@ -441,25 +398,24 @@ namespace clinamen {
 
 	export class RepeatUntilFail extends Decorator {
 
-		fail(stack){
-			stack.pop();
-			stack.last().node.fail(stack);
-			return this;
+		constructor(data:JsonData){
+			super(data);
+			this.type="repeatuntilfails";
 		}
 
-		success(stack){
-			return this;
-		}
-
-		next_(stack){
-			stack.push(this.child);
-			return this;
-		}
-
-		run(){
-			if(!this.child.run()){
-				return false;
+		next(stack:Stack):number{
+			if(!this.child){
+				return this.failure(stack);
 			}
+			if(stack.state===FAILURE){
+				return this.failure(stack);
+			}
+			if(stack.last()._id!=this.child._id){
+				stack.push(this.child);
+			}
+			stack.state = RUNNING;
+			return RUNNING;
+
 		}
 	}
 }

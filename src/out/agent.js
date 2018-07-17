@@ -5,10 +5,10 @@ var clinamen;
         //children: Array<Composite> = [];
         constructor(data) {
             super(data);
+            this.childrenIndex = {};
+            this.nameIndex = {};
             this.mainType = 'agent';
             this.type = data.type || 'agent';
-            this.world = data.world;
-            this.childrenIndex = {};
             if (data.children != null) {
                 for (let c of data.children) {
                     this.add(c);
@@ -16,14 +16,17 @@ var clinamen;
             }
         }
         add(node) {
-            if (this.children.length == 0) {
-                if (node instanceof clinamen.Composite) {
-                    this.children.push(node);
-                }
-                else {
-                    this.children.push(this.nodeConstructor(node));
-                }
-                this.children[0].setAgent(this);
+            var child;
+            if (node instanceof clinamen.Composite) {
+                child = node;
+            }
+            else {
+                child = this.nodeConstructor(node);
+            }
+            this.children.push(child);
+            this.childrenIndex[child._id] = child;
+            if (child.name != child.type) {
+                this.nameIndex[child.name] = child;
             }
             return this;
         }
@@ -38,44 +41,66 @@ var clinamen;
             return this.world.find(filter);
         }
         act(action, value) {
-            this.stack.state = clinamen.RUNNING;
             if (this[action]) {
                 return this[action](value);
             }
-            this.stack.state = clinamen.FAILURE;
             return clinamen.FAILURE;
         }
         wait() {
             return true;
         }
         tick(stack) {
-            if (stack.length == 0) {
-                return stack.state;
+            if (this.children.length == 0) {
+                return clinamen.FAILURE;
+            }
+            if (stack.length == 0 && stack.state !== clinamen.IDLE) {
+                var state = stack.state;
+                stack.state = clinamen.IDLE;
+                return state;
+            }
+            if (stack.length == 0 && stack.state === clinamen.IDLE) {
+                stack.push(this.children[0]);
             }
             var last = stack.last();
             var res = last.next(stack);
-            //if(last.type=='action' && )
-            //var res:number = stack.last().next(stack);
+            if (last.type == 'action') {
+                if (res === clinamen.SUCCESS || res === clinamen.RUNNING) {
+                    return res;
+                }
+            }
+            return this.tick(stack);
         }
         //{prop:['teste','prop'],val}
         //{prop:'teste',val:15}
         //{prop:[['teste','teste2'],'g'],val:16}
-        change(val) {
-            var prop = this.prop;
-            var propName = val.prop;
-            if (val.prop instanceof Array) {
-                var ob = this.prop;
-                for (let p of val.prop[0]) {
-                    if (!ob[p]) {
-                        //					ob[p] = {};
-                    }
-                    //			ob = ob[p];
-                }
-                prop = ob;
-                propName = val.prop[1];
+        //mudar prop ou outras coisas?
+        change(filter) {
+            if (!filter.create && !this.prop[filter.prop]) {
+                return clinamen.FAILURE;
             }
-            prop[propName] = val.val;
-            this.stack.state = clinamen.SUCCESS;
+            if (!filter.op) {
+                this.prop[filter.prop] = filter.val;
+                return clinamen.SUCCESS;
+            }
+            if (!this.prop[filter.prop]) {
+                this.prop[filter.prop] = 0;
+            }
+            if (filter.op === '+') {
+                this.prop[filter.prop] += filter.val;
+                return clinamen.SUCCESS;
+            }
+            if (filter.op === '-') {
+                this.prop[filter.prop] -= filter.val;
+                return clinamen.SUCCESS;
+            }
+            if (filter.op === '*') {
+                this.prop[filter.prop] *= filter.val;
+                return clinamen.SUCCESS;
+            }
+            if (filter.op === '/') {
+                this.prop[filter.prop] /= filter.val;
+                return clinamen.SUCCESS;
+            }
             return clinamen.SUCCESS;
         }
         next(stack = null) {
@@ -93,12 +118,11 @@ var clinamen;
             }
             return false;
         }
-        copy() {
-            return super.copy();
+        copy(data) {
+            return super.copy(data);
         }
         json(children = true) {
-            var js = super.json();
-            js.template = this.template;
+            var js = super.json(children);
             return js;
         }
     }

@@ -1,0 +1,13 @@
+SELECTOR
+  CONDITION (state=='b')
+    CONDITION (head=='_')
+      SEQUENCE
+        ACTION write 'e'
+        ACTION right
+        ACTION write 'e'
+        ACTION right
+        ACTION write '0'
+        ACTION right
+        ACTION right
+        ACTION write '0'
+        ACTION change (state,'o')
