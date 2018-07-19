@@ -4,18 +4,14 @@ namespace clinamen {
 
 	export abstract class Composite extends Node{
 
-		agent: Agent;
 		children: Array<Composite> = [];
 
-		constructor(data){
-			super(data);
-			this.mainType = 'composite';
+		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+			super(data,nodeIndex);
 			this.type = 'composite';
-			this.agent = data.agent || null;
-			this.setChildren(data);
 		}
 
-		setChildren(data):Node{
+		addChildren(data:JsonData):Node{
 			if(data.children){
 				for(let c of data.children){
 					this.add(c);
@@ -24,26 +20,13 @@ namespace clinamen {
 			return this;
 		}
 
-		setAgent(agent: Agent){
-			if(agent!=null){
-				this.agent = agent;
-				this.agent.childrenIndex[this._id] = this;
-				if(this.children!=null){
-					for(let c of this.children){
-						c.setAgent(agent);
-					}
-				}
-			}
-			return this;
-		}
 
-		add(node:Node):Node{
-			let child: Composite;
-			if(!(node instanceof Composite)){
-				child = this.nodeConstructor(node);
+		add(data:Node | JsonData):Node{
+			if(!(data instanceof Composite)){
+				this.children.push(this.get(data));
+				return this;
 			}
-			child.setAgent(this.agent);
-			this.children.push(child);
+			this.children.push(data);
 			return this;
 		}
 
@@ -52,21 +35,20 @@ namespace clinamen {
 
 	export class Selector extends Composite{
 
-		constructor(data){
-			super(data);
+		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+			super(data,nodeIndex);
 			this.type="selector";
 		}
 
-
-		next(stack:Stack):number{
+		next(stack:Stack,agent:IAgent=null):number{
 			if(!stack){
 				stack = this.stack;
 			}
 			if(stack.state===SUCCESS){
-				return this.success(stack);
+				return this.success(stack,agent);
 			}
 			if(this.index>=this.children.length){
-				return this.failure(stack);
+				return this.failure(stack,agent);
 			}
 			var nextNode:Node = this.children[this.index];
 			this.index++;
@@ -75,32 +57,24 @@ namespace clinamen {
 			return RUNNING;
 		}
 
-		run():boolean{
-			for(let c of this.children){
-				if(c.run()){
-					return true;
-				}
-			}
-			return false;
-		}
 	}
 
 	export class Sequence extends Composite{
 
-		constructor(data){
-			super(data);
+		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+			super(data,nodeIndex);
 			this.type="sequence";
 		}
 
-		next(stack:Stack):number{
+		next(stack:Stack,agent:IAgent=null):number{
 			if(!stack){
 				stack = this.stack;
 			}
 			if(stack.state===FAILURE){
-				return this.failure(stack);
+				return this.failure(stack,agent);
 			}
 			if(this.index>=this.children.length){
-				return this.success(stack);
+				return this.success(stack,agent);
 			}
 			var nextNode:Node = this.children[this.index];
 			this.index++;
@@ -109,14 +83,6 @@ namespace clinamen {
 			return RUNNING;
 		}
 
-		run(){
-			for(let c of this.children){
-				if(!c.run()){
-					return false;
-				}
-			}
-			return true;
-		}
 	}
 
 
@@ -124,39 +90,29 @@ namespace clinamen {
 
 		rchildren: Array<Node> = null;
 
-		constructor(data){
-			super(data);
+		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+			super(data,nodeIndex);
 			this.type="randomSelector";
 
 		}
 
-		next(stack:Stack):number{
+		next(stack:Stack,agent:IAgent=null):number{
 			if(!this.rchildren){
-				this.rchildren = this.shuffle(this.children);
+				this.rchildren = shuffle(this.children);
 			}
 			if(stack.state===SUCCESS){
 				this.rchildren = null;
-				return this.success(stack);
+				return this.success(stack,agent);
 			}
 			if(this.index>=this.children.length){
 				this.rchildren = null;
-				return this.failure(stack);
+				return this.failure(stack,agent);
 			}
 			var nextNode:Node = this.rchildren[this.index];
 			this.index++;
 			stack.push(nextNode);
 			stack.state = RUNNING;
 			return RUNNING;
-		}
-
-		run():boolean{
-			var rchildren = this.shuffle(this.children);
-			for(let c of rchildren){
-				if(c.run()){
-					return true;
-				}
-			}
-			return false;
 		}
 
 	}
@@ -165,38 +121,28 @@ namespace clinamen {
 
 		rchildren: Array<Node> = null;
 
-		constructor(data){
-			super(data);
+		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+			super(data,nodeIndex);
 			this.type="randomSequence";
 		}
 
-		next(stack:Stack):number{
+		next(stack:Stack,agent:IAgent=null):number{
 			if(!this.rchildren){
-				this.rchildren = this.shuffle(this.children);
+				this.rchildren = shuffle(this.children);
 			}
 			if(stack.state===FAILURE){
 				this.rchildren = null;
-				return this.failure(stack);
+				return this.failure(stack,agent);
 			}
 			if(this.index>=this.children.length){
 				this.rchildren = null;
-				return this.success(stack);
+				return this.success(stack,agent);
 			}
 			var nextNode:Node = this.rchildren[this.index];
 			this.index++;
 			stack.push(nextNode);
 			stack.state = RUNNING;
 			return RUNNING;
-		}
-
-		run():boolean{
-			var rchildren = this.shuffle(this.children);
-			for(let c of rchildren){
-				if(!c.run()){
-					return false;
-				}
-			}
-			return true;
 		}
 
 	}

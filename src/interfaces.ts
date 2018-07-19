@@ -2,6 +2,16 @@
 
 namespace clinamen {
 
+  export interface IEntity {
+    _id:string;
+  }
+
+  export interface IAgent extends IEntity{
+
+    test(exp:Array<any>):boolean;
+    act(act:string,val:JsonData):number;
+  }
+
   export interface Vector2 {
     x:number,
     y:number

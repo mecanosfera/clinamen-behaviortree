@@ -1,9 +1,10 @@
 /// <reference path='./interfaces.ts' />
-/// <reference path='./agent.ts' />
-/// <reference path='./world.ts' />
+/// <reference path='./util.ts' />
+/*/// <reference path='./agent.ts' />
 /// <reference path='./composite.ts' />
 /// <reference path='./decorator.ts' />
-/// <reference path='./action.ts' />
+/// <reference path='./action.ts' />*/
+
 
 namespace clinamen {
 
@@ -14,216 +15,111 @@ namespace clinamen {
   export const ERROR  : number = 4;
 
 
-  export abstract class Node {
-
+  export abstract class Node implements IEntity {
     _id: string;
-    mainType: string = 'node';
     type: string = 'node';
     name: string;
-    prop: Prop = {};
     children: Array<Node> = [];
     stack: Stack = new Stack();
     index: number = 0;
-    op: DictOp = {
-        "+": 	(a,b)   => {return a+b},
-        "-": 	(a,b)   => {return a-b},
-        "*": 	(a,b)   => {return a*b},
-        "/": 	(a,b)   => {return a/b},
-        "%": 	(a,b)   => {return a%b},
-        "==": (a,b)   => {return a==b},
-        "===":(a,b)   => {return a===b},
-        "!=":	(a,b)   => {return a!=b},
-        "!==":(a,b)   => {return a!==b},
-        ">":	(a,b)   => {return a>b},
-        ">=":	(a,b)   => {return a>=b},
-        "<":	(a,b)   => {return a<b},
-        "<=":	(a,b)   => {return a<=b},
-        "&&": (a,b)   => {return a&&b},
-        "||": (a,b)   => {return a||b},
-        "?" : (a,b,c) => {return a ? b : c;}
-    };
+    nodeIndex:Dict<Node>;
 
-    constructor(data: NodeData){
-      this.mainType = 'node';
+    constructor(data:JsonData,nodeIndex:Dict<Node>=null){
       this.type ='node';
       this._id = data._id || this.uuid();
       this.name = data.name;
-      if(data.prop!=null){
-  			for(let s in data.prop){
-  				this.prop[s] = data.prop[s];
-  			}
-  		}
-    }
-
-
-    //evaluates a Node object usign a filter
-    filterEval(obj:Node,filter:Filter):boolean{
-      var propVal;
-      //['prop1','prop2','prop3'] = {prop1:{prop2:{prop3:val}}}
-      /*if(filter.prop instanceof Array){
-        var pval = obj;
-        for(let p of filter.prop){
-          if(!pval[p]){
-            return false;
-          }
-          pval = pval[p];
-        }
-        propVal = pval;
-      } else {*/
-        if(!obj[filter.prop]){
-          return false;
-        }
-        propVal = obj[filter.prop];
-      //}
-      //if(filter.val instanceof Object){
-      //  return this.op[filter.op](propVal,this.filterEval(obj,(filter as Filter).val));
-      //}
-      return this.op[filter.op](propVal,filter.val);
-    }
-
-    searchChildren(obj:Node,filter:Filter):Array<Node>{
-      var res: Array<Node> = [];
-      for(let n of obj.children){
-        if(this.filterEval(n,filter)){
-          res.push(n);
-        }
+      this.nodeIndex = nodeIndex;
+      if(this.nodeIndex){
+        this.nodeIndex[this._id] = this;
       }
-      return res;
+      this.addChildren(data,nodeIndex);
     }
-
-    traverse(obj,filter={}){
-  		var fk = Object.keys(filter);
-  		var val = obj[fk[0]][filter[fk[0]]];
-  		if(val!=null){
-  			if(val instanceof Object && !(val instanceof Array)){
-  				return this.traverse(val,filter[fk[0]]);
-  			} else {
-  				return val;
-  			}
-  		}
-  		return null;
-
-  	}
 
     uuid(){
       return ([1e7] as any +-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
     }
 
-
-    nodeConstructor(node:JsonData){
-      switch(node.type.toLowerCase()){
+    get(data:JsonData,nodeIndex:Dict<Node>=null):Composite{
+      switch(data.type.toLowerCase()){
         case "selector":
-          return new Selector(node);
+          return new Selector(data,nodeIndex);
         case "sequence":
-          return new Sequence(node);
+          return new Sequence(data,nodeIndex);
         case "randomselector":
-          return new RandomSelector(node);
+          return new RandomSelector(data,nodeIndex);
         case "randomsequence":
-          return new RandomSequence(node);
+          return new RandomSequence(data,nodeIndex);
         case "inverter":
-          return new Inverter(node);
+          return new Inverter(data,nodeIndex);
         case "limit":
-          return new Limit(node);
-        case "find":
-          return new Find(node);
-        /*case "test":
-          return new Test(node);*/
-        case "count":
-          return new Count(node);
-        case "condition":
-          return new Condition(node);
+          return new Limit(data,nodeIndex);
+        case "tester":
+          return new Tester(data,nodeIndex);
         case "action":
-          return new Action(node);
+          return new Action(data,nodeIndex);
       }
-      return null;
     }
 
-    add(node:Node):Node{
-      return this;
-    }
+    add(data:Node | JsonData,nodeIndex:Dict<Node>=null):Node{
+			if(!(data instanceof Node)){
+				this.children.push(this.get(data,nodeIndex));
+				return this;
+			}
+			this.children.push(data);
+			return this;
+		}
 
-    remove(filter: Node | Filter = null):Node{
-      if(filter instanceof Node){
-        for(let i=0;i<this.children.length;i++){
-          if(filter._id && this.children[i]._id==filter._id){
-            this.children.splice(i,1);
-            return this;
-          }
-        }
-        return this;
-      }
-      if(!filter){
-        if(this['agent'] && this['agent']!=null){
-          let agent: Agent = this['agent'] as Agent;
-          for(let c of this.children){
-            agent.removeChildIndex(c._id);
-          }
-        }
-        this.children = [];
-        return this;
-      }
-      for(let i=this.children.length-1;i>-1;i--){
-        if(this.children.length==0){
-          return this;
-        }
-        if(this.filterEval(this.children[i],filter)){
-          if(this['agent'] && this['agent']!=null){
-            var agent = (this['agent'] as Agent).removeChildIndex(this.children[i]._id);
-          }
+    addChildren(data:JsonData,nodeIndex:Dict<Node>=null):Node{
+			if(data.children){
+				for(let c of data.children){
+					this.add(c,nodeIndex);
+				}
+			}
+			return this;
+		}
+
+    remove(_id:string):void{
+      for(let i=0;i<this.children.length;i++){
+        if(this.children[i]._id===_id){
           this.children.splice(i,1);
+          return;
         }
       }
-      return this;
     }
 
-    next(stack:Stack=null):number{
+    next(stack:Stack=null,agent:IAgent=null):number{
       return FAILURE;
     }
 
-    success(stack:Stack):number{
+    success(stack:Stack,agent:IAgent=null):number{
 			stack.state = SUCCESS;
 			stack.pop();
 			this.index = 0;
 			return SUCCESS;
 		}
 
-		failure(stack:Stack):number {
+		failure(stack:Stack,agent:IAgent=null):number {
 			stack.state = FAILURE;
 			stack.pop();
 			this.index = 0;
 			return FAILURE;
 		}
 
-		running(stack:Stack):number{
+		running(stack:Stack,agent:IAgent=null):number{
 			stack.state = RUNNING;
 			return RUNNING;
 		}
 
-
-    run():boolean{
-      return false;
+    copy():Node{
+      return this;
     }
 
-    copy(data:JsonData={}):Node{
-      return this.nodeConstructor(this.copyJson(data)) as Node;
-    }
-
-    copyJson(data:JsonData={}):JsonData{
-      var js = this.json(false);
-      js._id = this.uuid();
-      js.name = data.name || js.name;
-      for(let c of this.children){
-          js.push(c.copyJson());
-      }
-      return js;
-    }
 
     json(children:boolean=true):JsonData{
-      var js:JsonData = {
+      let js:JsonData = {
         _id: this._id,
   			type: this.type,
   			name: this.name,
-  			prop: this.prop,
   			children: []
   		}
       if(children && this.children!=null){
@@ -234,56 +130,7 @@ namespace clinamen {
       return js;
     }
 
-    shuffle(ar:Array<any>,copy:boolean=true):Array<any>{
-    	var a = ar;
-    	if(copy){
-    		a = ar.slice(0);
-    	}
-    	var currentIndex = a.length;
-    	var temporaryValue;
-    	var randomIndex;
 
-    	while (0 !== currentIndex) {
-    	    randomIndex = Math.floor(Math.random() * currentIndex);
-    	    currentIndex -= 1;
-    	    temporaryValue = a[currentIndex];
-    	    a[currentIndex] = a[randomIndex];
-    	    a[randomIndex] = temporaryValue;
-    	}
-    	return a;
-    }
-
-  }
-
-  export class Stack {
-    private _stack: Array<Node> = [];
-    state: number = IDLE;
-
-    push(node:Node):void{
-      this._stack.push(node);
-    }
-
-    pop():Node{
-      return this._stack.pop();
-    }
-
-    next():number{
-      if(this._stack.length==0){
-        return FAILURE;
-      }
-      return this.last().next(this);
-    }
-
-    last():Node{
-      if(this._stack.length==0){
-        return null;
-      }
-      return this._stack[this._stack.length-1];
-    }
-
-    get length():number{
-      return this._stack.length;
-    }
 
   }
 

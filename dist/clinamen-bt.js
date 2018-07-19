@@ -1,1041 +1,653 @@
-(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.clinamenbt = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-module.exports = require('./src/nodes.js');
-
-},{"./src/nodes.js":2}],2:[function(require,module,exports){
-class Node {
-
-  constructor(args={}){
-    this.init(args);
-  }
-
-  init(args){
-    this.mainType = 'node';
-    this.type ='node';
-    this.name = args.name;
-    this.temp = args.temp || true;
-    this.prop = {};
-    this.children = [];
-    if(args.prop!=null){
-			for(let s in args.prop){
-				this.prop[s] = args.prop[s];
-			}
-		}
-
-    this.stack = {
-      _stack: [],
-      done: false,
-      push: function(node,root=false){
-        if(this._stack.length==0){
-          this.done = false;
-          root = true;
+/// <reference path='./interfaces.ts' />
+/// <reference path='./node.ts' />
+var clinamen;
+(function (clinamen) {
+    function shuffle(ar, copy = true) {
+        var a = ar;
+        if (copy) {
+            a = ar.slice(0);
         }
-        this._stack.push({index:0, node:node, root:root});
-      },
-      pop: function(){
-        return this._stack.pop();
-      },
-      last: function(){
-        return this._stack[this._stack.length-1];
-      }
+        var currentIndex = a.length;
+        var temporaryValue;
+        var randomIndex;
+        while (0 !== currentIndex) {
+            randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex -= 1;
+            temporaryValue = a[currentIndex];
+            a[currentIndex] = a[randomIndex];
+            a[randomIndex] = temporaryValue;
+        }
+        return a;
+    }
+    clinamen.shuffle = shuffle;
+    //[1,'==',1]
+    //['zzz','!==','dddd']
+    /*[['a','!=',1],
+        '&&',
+        [[5,'>=',4],
+          '||',
+          false
+        ]
+      ]*/
+    function test(exp, func = null) {
+        return clinamen.logical[exp[1]](exp[0] instanceof Array ? test(exp[0], func) : (func != null ? func(exp[0]) : exp[0]), exp[2] instanceof Array ? test(exp[2], func) : (func != null ? func(exp[2]) : exp[2]));
+    }
+    clinamen.test = test;
+    clinamen.logical = {
+        "==": (a, b) => { return a == b; },
+        "===": (a, b) => { return a === b; },
+        "!=": (a, b) => { return a != b; },
+        "!==": (a, b) => { return a !== b; },
+        ">": (a, b) => { return a > b; },
+        ">=": (a, b) => { return a >= b; },
+        "<": (a, b) => { return a < b; },
+        "<=": (a, b) => { return a <= b; },
+        "&&": (a, b) => { return a && b; },
+        "||": (a, b) => { return a || b; }
     };
-
-    var stack = this.stack;
-
-    Object.defineProperty(stack,'length',{
-      enumerable: true,
-      get: function(){return stack._stack.length;}
-    });
-
-    this.stack = stack;
-
-    this.nodeConstructor = function(node){
-
-    	switch(node.type.toLowerCase()){
-    		case "selector":
-    			return new Selector(node);
-    		case "sequence":
-    			return new Sequence(node);
-    		case "randomselector":
-    			return new RandomSelector(node);
-    		case "randomsequence":
-    			return new RandomSequence(node);
-    		case "inverter":
-    			return new Inverter(node);
-    		case "limit":
-    			return new Limit(node);
-    		case "find":
-    			return new Find(node);
-    		case "test":
-    			return new Test(node);
-    		case "count":
-    			return new Count(node);
-    		case "condition":
-    			return new Condition(node);
-    		case "action":
-    			return new Action(node);
-    	}
-    	return null;
-    }
-
-
-    this.op = {
-    		"+": 	function(a,b){return a+b},
-    		"-": 	function(a,b){return a-b},
-    		"*": 	function(a,b){return a*b},
-    		"/": 	function(a,b){return a/b},
-    		"%": 	function(a,b){return a%b},
-    		"==": function(a,b){return a==b},
-    		"===":function(a,b){return a===b},
-    		"!=":	function(a,b){return a!=b},
-    		"!==":function(a,b){return a!==b},
-    		">":	function(a,b){return a>b},
-    		">=":	function(a,b){return a>=b},
-    		"<":	function(a,b){return a<b},
-    		"<=":	function(a,b){return a<=b},
-    		"&&": function(a,b){return a&&b},
-    		"||": function(a,b){return a||b}
+    clinamen.op = {
+        "+": (a, b) => { return a + b; },
+        "-": (a, b) => { return a - b; },
+        "*": (a, b) => { return a * b; },
+        "/": (a, b) => { return a / b; },
+        "%": (a, b) => { return a % b; },
+        "==": (a, b) => { return a == b; },
+        "===": (a, b) => { return a === b; },
+        "!=": (a, b) => { return a != b; },
+        "!==": (a, b) => { return a !== b; },
+        ">": (a, b) => { return a > b; },
+        ">=": (a, b) => { return a >= b; },
+        "<": (a, b) => { return a < b; },
+        "<=": (a, b) => { return a <= b; },
+        "&&": (a, b) => { return a && b; },
+        "||": (a, b) => { return a || b; },
+        "?": (a, b, c) => { return a ? b : c; }
     };
-  }
-
-  add(node){
-    return this;
-  }
-
-  remove(filter){
-    if(!filter || filter=={}){
-      this.children = [];
-    } else if (filter) {
-      for(let i = this.children.length-1; i>=0; i--){
-        var rmv = true;
-        for(let p in filter){
-          if(!(p in this.children[p]) || this.children[i][p]!=filter[p]){
-            rmv = false;
-            break;
-          }
+    class Stack {
+        constructor() {
+            this._stack = [];
+            this.state = clinamen.IDLE;
         }
-        if(rmv){
-          this.children.splice(i,1);
+        push(node) {
+            this._stack.push(node);
         }
-      }
-    }
-  }
-
-  run(callstack){
-    return false;
-  }
-
-  json(){
-    var js = {
-			type: this.type,
-			name: this.name,
-			prop: this.prop,
-      temp: this.temp,
-			children: []
-		}
-    if(this.children!=null){
-  		for(let c of this.children){
-  			js.children.push(c.json());
-  		}
-    }
-    return js;
-  }
-
-
-
-  shuffle(ar,copy=true){
-  	var a = ar;
-  	if(copy){
-  		a = ar.slice(0);
-  	}
-  	var currentIndex = a.length;
-  	var temporaryValue;
-  	var randomIndex;
-
-  	while (0 !== currentIndex) {
-  	    randomIndex = Math.floor(Math.random() * currentIndex);
-  	    currentIndex -= 1;
-  	    temporaryValue = a[currentIndex];
-  	    a[currentIndex] = a[randomIndex];
-  	    a[randomIndex] = temporaryValue;
-  	}
-
-  	return a;
-  }
-
-}
-
-class World extends Node{
-
-  init(args){
-      super.init(args);
-      this.mainType = 'world';
-  		this.type = args.type || 'world';
-      this.instances = [];
-      this.templates = {};
-      this.children = [];
-      this.started = false;
-
-      if(args.instances!=null){
-          for(let i of args.instances){
-            this.instances.push(i);
-          }
-      }
-
-      if(args.templates!=null){
-        for(let t of args.templates){
-          this.templates[t["name"]] = t;
+        pop() {
+            return this._stack.pop();
         }
-      }
-  }
-
-
-  start(){
-    if(this.children.length==0){
-      for(let a of this.instances){
-        this.startInstance(a);
-      }
-      this.started=true;
+        next() {
+            if (this._stack.length == 0) {
+                return clinamen.FAILURE;
+            }
+            return this.last().next(this);
+        }
+        last() {
+            if (this._stack.length == 0) {
+                return null;
+            }
+            return this._stack[this._stack.length - 1];
+        }
+        get length() {
+            return this._stack.length;
+        }
     }
-    return this;
-  }
-
-  startInstance(instance){
-    if(this.templates[instance.template]){
-      var ag = new Agent(this.templates[instance.template]);
-      ag.name = instance.name || instance.template;
-      ag.template = instance.template;
-      ag.world = this;
-      if(instance.prop){
-        ag.prop = instance.prop;
-      }
-      this.children.push(ag);
+    clinamen.Stack = Stack;
+})(clinamen || (clinamen = {}));
+/// <reference path='./interfaces.ts' />
+/// <reference path='./util.ts' />
+var clinamen;
+(function (clinamen) {
+    clinamen.FAILURE = 0;
+    clinamen.SUCCESS = 1;
+    clinamen.RUNNING = 2;
+    clinamen.IDLE = 3;
+    clinamen.ERROR = 4;
+    class Node {
+        constructor(data, nodeIndex = null) {
+            this.type = 'node';
+            this.children = [];
+            this.stack = new clinamen.Stack();
+            this.index = 0;
+            this.type = 'node';
+            this._id = data._id || this.uuid();
+            this.name = data.name;
+            this.nodeIndex = nodeIndex;
+            if (this.nodeIndex) {
+                this.nodeIndex[this._id] = this;
+            }
+            this.addChildren(data, nodeIndex);
+        }
+        uuid() {
+            return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+        }
+        get(data, nodeIndex = null) {
+            switch (data.type.toLowerCase()) {
+                case "selector":
+                    return new clinamen.Selector(data, nodeIndex);
+                case "sequence":
+                    return new clinamen.Sequence(data, nodeIndex);
+                case "randomselector":
+                    return new clinamen.RandomSelector(data, nodeIndex);
+                case "randomsequence":
+                    return new clinamen.RandomSequence(data, nodeIndex);
+                case "inverter":
+                    return new clinamen.Inverter(data, nodeIndex);
+                case "limit":
+                    return new clinamen.Limit(data, nodeIndex);
+                case "tester":
+                    return new clinamen.Tester(data, nodeIndex);
+                case "action":
+                    return new clinamen.Action(data, nodeIndex);
+            }
+        }
+        add(data, nodeIndex = null) {
+            if (!(data instanceof Node)) {
+                this.children.push(this.get(data, nodeIndex));
+                return this;
+            }
+            this.children.push(data);
+            return this;
+        }
+        addChildren(data, nodeIndex = null) {
+            if (data.children) {
+                for (let c of data.children) {
+                    this.add(c, nodeIndex);
+                }
+            }
+            return this;
+        }
+        remove(_id) {
+            for (let i = 0; i < this.children.length; i++) {
+                if (this.children[i]._id === _id) {
+                    this.children.splice(i, 1);
+                    return;
+                }
+            }
+        }
+        next(stack = null, agent = null) {
+            return clinamen.FAILURE;
+        }
+        success(stack, agent = null) {
+            stack.state = clinamen.SUCCESS;
+            stack.pop();
+            this.index = 0;
+            return clinamen.SUCCESS;
+        }
+        failure(stack, agent = null) {
+            stack.state = clinamen.FAILURE;
+            stack.pop();
+            this.index = 0;
+            return clinamen.FAILURE;
+        }
+        running(stack, agent = null) {
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
+        }
+        copy() {
+            return this;
+        }
+        json(children = true) {
+            let js = {
+                _id: this._id,
+                type: this.type,
+                name: this.name,
+                children: []
+            };
+            if (children && this.children != null) {
+                for (let c of this.children) {
+                    js.children.push(c.json());
+                }
+            }
+            return js;
+        }
     }
-    return this;
-  }
-
-  add(args){
-    if(args.template){
-      this.templates[args.template[name]] = args.template;
+    clinamen.Node = Node;
+})(clinamen || (clinamen = {}));
+/// <reference path='./node.ts' />
+/// <reference path='./node.ts' />
+var clinamen;
+(function (clinamen) {
+    class Composite extends clinamen.Node {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.children = [];
+            this.type = 'composite';
+        }
+        addChildren(data) {
+            if (data.children) {
+                for (let c of data.children) {
+                    this.add(c);
+                }
+            }
+            return this;
+        }
+        add(data) {
+            if (!(data instanceof Composite)) {
+                this.children.push(this.get(data));
+                return this;
+            }
+            this.children.push(data);
+            return this;
+        }
     }
-    if(args.instance){
-      this.instances.push(args.instance);
-      if(this.started){
-        this.setInstance(args.instance);
-      }
+    clinamen.Composite = Composite;
+    class Selector extends Composite {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.type = "selector";
+        }
+        next(stack, agent = null) {
+            if (!stack) {
+                stack = this.stack;
+            }
+            if (stack.state === clinamen.SUCCESS) {
+                return this.success(stack, agent);
+            }
+            if (this.index >= this.children.length) {
+                return this.failure(stack, agent);
+            }
+            var nextNode = this.children[this.index];
+            this.index++;
+            stack.push(nextNode);
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
+        }
     }
-    return this;
-  }
-
-
-  run(iterator=false){
-    for(let c of this.children){
-      c.run(iterator);
+    clinamen.Selector = Selector;
+    class Sequence extends Composite {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.type = "sequence";
+        }
+        next(stack, agent = null) {
+            if (!stack) {
+                stack = this.stack;
+            }
+            if (stack.state === clinamen.FAILURE) {
+                return this.failure(stack, agent);
+            }
+            if (this.index >= this.children.length) {
+                return this.success(stack, agent);
+            }
+            var nextNode = this.children[this.index];
+            this.index++;
+            stack.push(nextNode);
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
+        }
     }
-    return true;
-  }
-
-  find(filter){
-    if(filter=={}){
-      return this.children;
-    } else {
-      var r = [];
-      for(let c of this.children){
-
-      }
-      return r;
-      //implement
+    clinamen.Sequence = Sequence;
+    class RandomSelector extends Composite {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.rchildren = null;
+            this.type = "randomSelector";
+        }
+        next(stack, agent = null) {
+            if (!this.rchildren) {
+                this.rchildren = clinamen.shuffle(this.children);
+            }
+            if (stack.state === clinamen.SUCCESS) {
+                this.rchildren = null;
+                return this.success(stack, agent);
+            }
+            if (this.index >= this.children.length) {
+                this.rchildren = null;
+                return this.failure(stack, agent);
+            }
+            var nextNode = this.rchildren[this.index];
+            this.index++;
+            stack.push(nextNode);
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
+        }
     }
-  }
-
-
-  json(){
-    var js = super.json();
-    js.instances = [];
-    for(a of this.instances){
-      var name = null;
-      if(a.name!=null){
-        name = a.name;
-      }
-      js.instances.push({
-        template: a.template,
-        name: name,
-        position: a.position
-      });
+    clinamen.RandomSelector = RandomSelector;
+    class RandomSequence extends Composite {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.rchildren = null;
+            this.type = "randomSequence";
+        }
+        next(stack, agent = null) {
+            if (!this.rchildren) {
+                this.rchildren = clinamen.shuffle(this.children);
+            }
+            if (stack.state === clinamen.FAILURE) {
+                this.rchildren = null;
+                return this.failure(stack, agent);
+            }
+            if (this.index >= this.children.length) {
+                this.rchildren = null;
+                return this.success(stack, agent);
+            }
+            var nextNode = this.rchildren[this.index];
+            this.index++;
+            stack.push(nextNode);
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
+        }
     }
-    js.templates = [];
-    for(t in this.templates){
-      js.templates.push(this.templates[t]);
+    clinamen.RandomSequence = RandomSequence;
+})(clinamen || (clinamen = {}));
+/// <reference path='./node.ts' />
+var clinamen;
+(function (clinamen) {
+    class Decorator extends clinamen.Composite {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.type = 'decorator';
+        }
+        addChildren(data, nodeIndex = null) {
+            if (data.child != null) {
+                this.add(data.child, nodeIndex);
+            }
+            else {
+                this.child = null;
+            }
+            return this;
+        }
+        add(node, nodeIndex = null) {
+            if (!(node instanceof clinamen.Node)) {
+                this.child = this.get(node, nodeIndex);
+                return this;
+            }
+            this.child = node;
+            return this;
+        }
+        next(stack, agent = null) {
+            if (!this.child || stack.state === clinamen.FAILURE) {
+                return this.failure(stack, agent);
+            }
+            if (stack.state === clinamen.SUCCESS) {
+                return this.success(stack, agent);
+            }
+            stack.state = clinamen.RUNNING;
+            stack.push(this.child);
+            return clinamen.RUNNING;
+        }
+        json(children = true) {
+            var js = super.json(false);
+            if (children) {
+                js.child = this.child.json();
+            }
+            return js;
+        }
     }
-    return js;
-
-  }
-
-}
-
-class Agent extends Node {
-
-	init(args){
-		super.init(args);
-		this.mainType = 'agent';
-		this.type = args.type || 'agent';
-		this.template = args.template || this.type;
-		this.world = args.world;
-
-		if(args.children!=null){
-			for(let c of args.children){
-				this.add(c);
-			}
-		}
-	}
-
-	add(node){
-		if(this.children.length==0){
-			if(node instanceof Composite){
-				this.children.push(node);
-			} else {
-				this.children.push(this.nodeConstructor(node));
-			}
-			this.children[0].setAgent(this);
-		}
-		return this;
-	}
-
-
-
-	find(filter){
-		return this.world.find(filter);
-	}
-
-
-	act(action,value){
-		if(this[action]){
-			return this[action](value);
-		}
-		return false;
-	}
-
-	wait(){
-		return true;
-	}
-
-	change(state){
-		for(let s in state){
-			if(this.prop[s]!=null){
-				if(state[s] instanceof Array){
-					var v = state[s][1];
-					if(v instanceof Object){
-						v = this.traverse(v);
-					}
-					this.prop[s] = this.op[state[s][0]](this.prop[s]+v);
-				} else {
-					var v = state[s];
-					if(v instanceof Object){
-						v = this.traverse(v);
-					}
-					this.prop[s] = v;
-				}
-			}
-		}
-		return true;
-	}
-
-	next(){
-		if(this.stack.length==0){
-			this.stack.push(this.children[0]);
-		} else {
-			this.stack.last().node.next(this.stack);
-		}
-		return this;
-	}
-
-	run(){
-		if(this.temp){
-			this.res = {};
-		}
-		if(this.children.length>0){
-			return this.children[0].run();
-		}
-		return false;
-	}
-
-	json(){
-		var js = super.json();
-		js.template = this.template;
-		return js;
-	}
-
-
-}
-
-class Composite extends Node{
-
-	init(args){
-		super.init(args);
-		this.mainType = 'composite';
-		this.type = 'composite';
-		this.temp = args.temp || true;
-		this.agent = args.agent || null;
-		this.children = [];
-		this.setChildren(args);
-	}
-
-	setChildren(args){
-		if(args.children!=null){
-			for(let c of args.children){
-				this.add(c);
-			}
-		}
-		return this;
-	}
-
-	setAgent(agent){
-		if(agent!=null){
-			this.agent = agent;
-			if(this.children!=null){
-				for(let c of this.children){
-					c.setAgent(agent);
-				}
-			}
-		}
-		return this;
-	}
-
-	add(behavior){
-		var child = behavior;
-		if(!(behavior instanceof Composite)){
-			child = this.nodeConstructor(behavior);
-		}
-		child.setAgent(this.agent);
-		this.children.push(child);
-		return this;
-	}
-
-}
-
-
-class Selector extends Composite{
-
-	init(args){
-		super.init(args);
-		this.type="selector";
-	}
-
-	fail(stack){
-		//stack.last().index++;
-		return this;
-	}
-
-	success(stack){
-		stack.last().index = 0;
-		stack.pop();
-		if(stack.length>0){
-			stack.last().node.success(stack);
-		}
-		return this;
-	}
-
-	next(stack){
-		if(!stack){
-			stack = this.stack;
-		}
-		var index = stack.last().index;
-		var previous = stack.last();
-		if(index<this.children.length){
-			stack.push(this.children[index]);
-			previous.index++;
-		} else {
-			stack.pop();
-			if(stack.length>0){
-				stack.last().node.fail(stack);
-			}
-		}
-		return this;
-	}
-
-	run(){
-
-		for(let c of this.children){
-			if(c.run()){
-				return true;
-			}
-		}
-		return false;
-	}
-}
-
-class Sequence extends Composite{
-
-	init(args){
-		super.init(args);
-		this.type="sequence";
-	}
-
-	success(stack){
-		//stack.last().index++;
-		return this;
-	}
-
-	fail(stack){
-		stack.pop();
-		if(stack.length>0){
-			stack.last().node.fail(stack);
-		}
-		return this;
-	}
-
-	next(stack){
-		if(!stack){
-			stack = this.stack;
-		}
-		if(stack.done){
-			stack.done = false;
-		}
-		var previous = stack.last();
-		var index = previous.index;
-		if(index<this.children.length){
-			stack.push(this.children[index]);
-			previous.index++;
-		} else {
-			stack.pop();
-			if(stack.length>0){
-				stack.last().node.success(stack);
-			}
-		}
-		return this;
-	}
-
-	run(){
-		console.log(this.children.length);
-		for(let c of this.children){
-			if(!c.run()){
-				return false;
-			}
-		}
-		return true;
-	}
-}
-
-
-class RandomSelector extends Composite {
-
-	init(args){
-		super.init(args);
-		this.type="randomSelector";
-	}
-
-	run(){
-		var rchildren = this.shuffle(this.children);
-		for(let c of rchildren){
-			if(c.run()){
-				return true;
-			}
-		}
-		return false;
-	}
-
-}
-
-class RandomSequence extends Composite {
-
-	init(args){
-		super.init(args);
-		this.type="randomSequence";
-	}
-
-	run(){
-		var rchildren = this.shuffle(this.children);
-		for(let c of rchildren){
-			if(!c.run()){
-				return false;
-			}
-		}
-		return true;
-	}
-
-}
-
-class Decorator extends Composite{
-
-	init(args){
-		super.init(args);
-		this.mainType = 'decorator';
-		this.type = 'decorator';
-		this.result = args.result || null;
-		this.filter = args.filter || null;
-		this.child = null;
-		this.setChildren(args);
-	}
-
-	setChildren(behavior){
-		if(behavior.child!=null){
-			this.add(behavior.child);
-		} else {
-			this.child = null;
-		}
-		return this;
-	}
-
-	setAgent(agent){
-		if(agent!=null){
-			this.agent = agent;
-			if(this.child!=null){
-				this.child.setAgent(agent);
-			}
-		}
-		return this;
-	}
-
-	add(node){
-		var child = node;
-		if(!(node instanceof Node)){
-			child = this.nodeConstructor(node);
-		}
-		child.setAgent(this.agent);
-		this.child = child;
-		return this;
-	}
-
-
-	traverse(obj,filter){
-		var fk = Object.keys(filter);
-		var val = obj[fk[0]][filter[fk[0]]];
-		if(val!=null){
-			if(val instanceof Object && !(val instanceof Array)){
-				return this.traverse(val,filter[fk[0]]);
-			} else {
-				return val;
-			}
-		}
-		return null;
-
-	}
-
-	fail(stack){
-		stack.pop();
-		stack.last().node.fail(stack);
-		return this;
-	}
-
-	success(stack){
-		stack.pop();
-		stack.last().node.success(stack);
-		return this;
-	}
-
-	next(stack){
-		if(this.testCondition()){
-			stack.push(this.child);
-		} else {
-			this.fail(stack);
-		}
-		return this;
-	}
-
-	testCondition(){
-		return false;
-	}
-
-	run(){
-		if(!this.child){
-			return false;
-		}
-		if(this.testCondition()){
-			return this.child.run();
-		}
-		return false;
-	}
-
-	json(){
-		var js = super.json();
-		js.child = this.child.json();
-		js.filter = this.filter;
-		js.result = this.result;
-		return js;
-	}
-
-}
-
-
-class Inverter extends Decorator{
-
-	init(args){
-		super.init(args);
-		this.type="inverter";
-	}
-
-	success(stack){
-		stack.pop();
-		stack.last().node.fail(stack);
-		return this;
-	}
-
-	fail(stack){
-		stack.pop();
-		stack.last().node.success(stack);
-		return this;
-	}
-
-	next(stack){
-		stack.push(this.child);
-		return this;
-	}
-
-	run(){
-
-		if(this.child==null){
-			return false;
-		}
-		return !this.child.run();
-	}
-
-}
-
-
-class Limit extends Decorator{
-
-	init(args){
-		super.init(args);
-		this.type = 'limit';
-		this.max = node.max || 0;
-		this.runs = 0;
-	}
-
-	testCondition(){
-		if(this.runs>=this.max){
-			return false;
-		}
-		this.runs++;
-		return true;
-	}
-
-	json(){
-		var js = super.json();
-		js.max = this.max;
-		js.runs = this.runs;
-		return js;
-	}
-
-}
-
-
-class Find extends Decorator{
-
-		init(args){
-			super.init(args);
-			this.type="find";
-			this.filter = args.filter || {};
-			this.scope = args.scope || 'world';
-		}
-
-		testCondition(){
-			if(this.agent.temp && this.result!=null){
-				this.agent.prop[this.result] = null;
-			}
-			var res = null;
-			if(this.scope=='world'){
-				res = this.agent.world.find(this.filter);
-			} else {
-				res = this.agent.find(this.filter);
-			}
-			if(this.result!=null){
-				this.agent.prop[this.result] = res;
-			}
-			if(res!=null && this.child!=null){
-				return true;
-			}
-		}
-
-		json(){
-			var js = super.json();
-			js.scope = this.scope;
-			return js;
-		}
-
-}
-
-class Condition extends Decorator{
-
-	//{res/prop:?, op:'==', val/res/prop:?}
-	init(args){
-		super.init(args);
-		this.type = 'condition';
-	}
-
-	testCondition(){
-		var obj = this.agent;
-		var k1 = Object.keys(this.filter)[0];
-		var k2 = Object.keys(this.filter)[2];
-		var v1 = this.traverse(this.agent,{[k1] : this.filter[ Object.keys(this.filter)[0] ]});
-		var v2 = this.filter.val || this.traverse(this.agent,{[k2]: this.filter[Object.keys(this.filter)[2]]});
-
-		if(this.op[this.filter.op](v1,v2) && this.child!=null){
-			return true;
-		}
-		return false;
-	}
-
-}
-
-
-class Count extends Decorator {
-
-	//{res/prop:?}
-	init(args){
-		super.init(args);
-		this.type = "count";
-	}
-
-	run(){
-		if(this.agent.temp && this.result!=null){
-			this.agent.prop[this.result] = null;
-		}
-
-		var c = null;
-		c = this.traverse(this.agent,this.filter);
-		if(c!=null && c instanceof Array){
-			if(this.result!=null){
-				this.agent.prop[this.result] = c.length;
-			}
-			if(this.child!=null){
-				return this.child.run(iterator);
-			} else {
-				return false;
-			}
-		}
-		return false;
-	}
-
-}
-
-class Succeeder extends Decorator {
-
-	fail(stack){
-		return this.success(stack);
-	}
-
-	success(stack){
-		stack.pop();
-		stack.last().node.success(stack);
-		return this;
-	}
-
-	next(stack){
-		stack.push(this.child);
-		return this;
-	}
-
-	run(){
-		this.child.run();
-		return true;
-	}
-}
-
-class Failer extends Decorator {
-
-	fail(stack){
-		stack.pop();
-		stack.last().node.fail(stack);
-		return this;
-	}
-
-	success(stack){
-		return this.fail(stack);
-	}
-
-	next(stack){
-		stack.push(this.child);
-		return this;
-	}
-
-	run(){
-		this.child.run();
-		return false;
-	}
-
-}
-
-
-class Repeater extends Decorator {
-
-	init(args){
-		this.max = args.max;
-		this.runs = 0;
-	}
-
-	fail(stack){
-		if(this.max && this.runs<=this.max){
-			this.runs = 0;
-			stack.pop();
-			stack.last().node.fail(stack);
-		}
-	}
-
-	success(stack){
-		if(this.max && this.runs<=this.max){
-			this.runs = 0;
-			stack.pop();
-			stack.last().node.success(stack);
-		}
-	}
-
-
-	next(stack){
-		if(!this.max){
-			stack.push(this.child);
-		} else if (this.runs<=this.max){
-			stack.push(this.child);
-			this.runs++;
-		}
-		return this;
-	}
-
-	run(){
-		if(this.child==null){
-			return false;
-		}
-		if(!this.max){
-			this.child.run();
-		} else {
-			if(this.runs<this.max){
-				this.child.run();
-				this.runs++;
-			} else {
-				this.runs = 0;
-				return this.child.run();
-			}
-		}
-	}
-
-}
-
-class RepeatUntilSucceeds extends Decorator {
-
-	success(stack){
-		stack.pop();
-		stack.last().node.success(stack);
-		return this;
-	}
-
-	fail(stack){
-		return this;
-	}
-
-	next(stack){
-		stack.push(this.child);
-		return this;
-	}
-
-	run(){
-		if(this.child.run()){
-			return true;
-		}
-	}
-}
-
-class RepeatUntilFail extends Decorator {
-
-	fail(stack){
-		stack.pop();
-		stack.last().node.fail(stack);
-		return this;
-	}
-
-	success(stack){
-		return this;
-	}
-
-	next(stack){
-		stack.push(this.child);
-		return this;
-	}
-
-	run(){
-		if(!this.child.run()){
-			return false;
-		}
-	}
-}
-
-class Action extends Composite {
-
-	init(args){
-		super.init(args);
-		this.mainType = 'action';
-		this.type = args.type || 'action';
-		this.filter = args.filter || null;
-		this.target = args.target || 'self';
-		this.act = args.act || 'wait';
-		this.value = args.value || null ;
-	}
-
-	setChildren(node){
-		this.children = null;
-		return this;
-	}
-
-	add(node){
-		return this;
-	}
-
-	next(stack){
-		stack.pop();
-		if(this.run()){
-			stack.done = true;
-			stack.last().node.success(stack);
-		} else {
-			stack.last().node.fail(stack);
-		}
-		return this;
-	}
-
-
-	run(){
-		if(this.target=='self'){
-			return this.agent.act(this.act,this.value);
-		} else if (this.target=='world'){
-			return this.agent.world.act(this.act,this.value);
-		} else {
-			var t = this.traverse(this.agent, this.target);
-			if(t!=null && (t instanceof Object && !(t instanceof Array))){
-				return t.act(this.act,this.value);
-			}
-			return false;
-		}
-	}
-
-	json(){
-		var js = super.json();
-		js.target = this.target;
-		js.filter = this.filter;
-		js.act = this.act;
-		js.value = this.value;
-		return js;
-	}
-
-}
-
-module.exports = {
-	'Node'					 			: Node,
-	'World'					 			: World,
-	'Agent'					 			: Agent,
-	'Composite'			 			: Composite,
-	'Selector'			 			: Selector,
-	'Sequence'			 			: Sequence,
-	'RandomSelector' 			: RandomSelector,
-	'RandomSequence' 			: RandomSequence,
-	'Decorator'			 			: Decorator,
-	'Inverter'			 			: Inverter,
-	'Limit'					 			: Limit,
-	'Condition'			 			: Condition,
-	'Find'					 			: Find,
-	'Count'					 			: Count,
-	'Succeeder'						: Succeeder,
-	'Failer'							: Failer,
-	'Repeater'						: Repeater,
-	'RepeatUntilSucceeds'	: RepeatUntilSucceeds,
-	'RepeatUntilFail'			: RepeatUntilFail,
-	'Action'				 			: Action
-};
-
-},{}]},{},[1])(1)
-});
+    clinamen.Decorator = Decorator;
+    class Jump extends Decorator {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.type = 'jump';
+            this.targetId = data.targetId || null;
+        }
+        addChildren(data, nodeIndex = null) {
+            if (!data.targetId) {
+                this.child = null;
+                return this;
+            }
+            if (!nodeIndex || !nodeIndex[data.targetId]) {
+                this.child = null;
+                return this;
+            }
+            this.child = nodeIndex[data.targetId];
+            return this;
+        }
+        next(stack, agent = null) {
+            if (!this.targetId) {
+                return this.failure(stack, agent);
+            }
+            if (!this.nodeIndex) {
+                return this.failure(stack, agent);
+            }
+            if (!this.child && !this.nodeIndex[this.targetId]) {
+                return this.failure(stack, agent);
+            }
+            this.child = this.nodeIndex[this.targetId];
+            stack.push(this.child);
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
+        }
+        json() {
+            let js = super.json();
+            js.targetId = this.targetId;
+            return js;
+        }
+    }
+    clinamen.Jump = Jump;
+    class Inverter extends Decorator {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.type = "inverter";
+        }
+        next(stack, agent = null) {
+            if (!this.child || stack.state === clinamen.SUCCESS) {
+                return this.failure(stack, agent);
+            }
+            if (stack.state === clinamen.FAILURE) {
+                return this.success(stack, agent);
+            }
+            stack.state = clinamen.RUNNING;
+            stack.push(this.child);
+            return clinamen.RUNNING;
+        }
+    }
+    clinamen.Inverter = Inverter;
+    class Limit extends Decorator {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.runs = 0;
+            this.type = 'limit';
+            this.max = data.max || 0;
+            this.reset = data.reset || false;
+        }
+        next(stack, agent = null) {
+            if (!this.child || this.runs >= this.max) {
+                if (this.reset) {
+                    this.runs = 0;
+                }
+                return this.failure(stack, agent);
+            }
+            stack.state = clinamen.RUNNING;
+            stack.push(this.child);
+            this.runs++;
+            return clinamen.RUNNING;
+        }
+        json() {
+            var js = super.json();
+            js.max = this.max;
+            js.runs = this.runs;
+            return js;
+        }
+    }
+    clinamen.Limit = Limit;
+    //Finds another Agent id
+    class Tester extends Decorator {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.type = 'tester';
+            this.exp = data.exp || null;
+        }
+        next(stack, agent = null) {
+            if (!this.child || stack.state === clinamen.FAILURE) {
+                return this.failure(stack, agent);
+            }
+            if (stack.state === clinamen.SUCCESS) {
+                return this.success(stack, agent);
+            }
+            if (!agent || !this.exp || !agent.test(this.exp)) {
+                return this.failure(stack, agent);
+            }
+            stack.state = clinamen.RUNNING;
+            stack.push(this.child);
+            return clinamen.RUNNING;
+        }
+    }
+    clinamen.Tester = Tester;
+    class Succeeder extends Decorator {
+        next(stack, agent = null) {
+            if (stack.state === clinamen.RUNNING) {
+                stack.push(this.child);
+                return clinamen.RUNNING;
+            }
+            return this.success(stack, agent);
+        }
+    }
+    clinamen.Succeeder = Succeeder;
+    class Failer extends Decorator {
+        next(stack, agent = null) {
+            if (stack.state === clinamen.RUNNING) {
+                stack.push(this.child);
+                return clinamen.RUNNING;
+            }
+            return this.failure(stack, agent);
+        }
+    }
+    clinamen.Failer = Failer;
+    class RepeatUntilSucceeds extends Decorator {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.type = "repeatuntilsucceeds";
+        }
+        next(stack, agent = null) {
+            if (!this.child) {
+                return this.failure(stack, agent);
+            }
+            if (stack.state === clinamen.SUCCESS) {
+                return this.success(stack, agent);
+            }
+            if (stack.last()._id != this.child._id) {
+                stack.push(this.child);
+            }
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
+        }
+    }
+    clinamen.RepeatUntilSucceeds = RepeatUntilSucceeds;
+    class RepeatUntilFail extends Decorator {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.type = "repeatuntilfails";
+        }
+        next(stack, agent = null) {
+            if (!this.child) {
+                return this.failure(stack, agent);
+            }
+            if (stack.state === clinamen.FAILURE) {
+                return this.failure(stack, agent);
+            }
+            if (stack.last()._id != this.child._id) {
+                stack.push(this.child);
+            }
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
+        }
+    }
+    clinamen.RepeatUntilFail = RepeatUntilFail;
+})(clinamen || (clinamen = {}));
+/// <reference path='./node.ts' />
+var clinamen;
+(function (clinamen) {
+    class Action extends clinamen.Composite {
+        constructor(data, nodeIndex = null) {
+            super(data, nodeIndex);
+            this.type = data.type || 'action';
+        }
+        addChildren(node) {
+            this.children = null;
+            return this;
+        }
+        add(data) {
+            return this;
+        }
+        next(stack, agent = null) {
+            if (!agent || !this.act) {
+                return this.failure(stack, agent);
+            }
+            let res = agent.act(this.act, this.val);
+            if (res === clinamen.FAILURE) {
+                return this.failure(stack);
+            }
+            if (res === clinamen.SUCCESS) {
+                return this.success(stack);
+            }
+            stack.state = clinamen.RUNNING;
+            return clinamen.RUNNING;
+        }
+        json(children = true) {
+            var js = super.json(children);
+            js.act = this.act;
+            js.val = this.val;
+            return js;
+        }
+    }
+    clinamen.Action = Action;
+})(clinamen || (clinamen = {}));
+/// <reference path='./node.ts' />
+var clinamen;
+(function (clinamen) {
+    class Agent extends clinamen.Node {
+        constructor(data) {
+            super(data);
+            this.mem = data.blackboard || {};
+            this.stack = new clinamen.Stack();
+        }
+        test(exp) {
+            return clinamen.test(exp, (val) => {
+                if (val instanceof Object) {
+                    if (!val['mem'] || !this.mem[val['mem']]) {
+                        return null;
+                    }
+                    return this.mem[val['mem']];
+                }
+                return val;
+            });
+        }
+        act(act, val = null) {
+            switch (act) {
+                case 'wait':
+                    return this.wait();
+                case 'change':
+                    return this.change(val);
+            }
+            return clinamen.RUNNING;
+        }
+        wait() {
+            return clinamen.SUCCESS;
+        }
+        change(val) {
+            for (let k in val) {
+                this.mem[k] = val;
+            }
+            return clinamen.SUCCESS;
+        }
+        tick(stack = null) {
+            stack = (stack == null) ? this.stack : stack;
+            if (this.children.length == 0) {
+                return clinamen.FAILURE;
+            }
+            if (stack.length == 0 && stack.state !== clinamen.IDLE) {
+                var state = stack.state;
+                stack.state = clinamen.IDLE;
+                return state;
+            }
+            if (stack.length == 0 && stack.state === clinamen.IDLE) {
+                stack.push(this.children[0]);
+            }
+            var last = stack.last();
+            var res = last.next(stack, this);
+            if (last.type == 'action') {
+                if (res === clinamen.SUCCESS || res === clinamen.RUNNING) {
+                    return res;
+                }
+            }
+            //return res;
+            return this.tick(stack);
+        }
+        json() {
+            let js = super.json();
+            js.mem = this.mem;
+            return js;
+        }
+    }
+    clinamen.Agent = Agent;
+})(clinamen || (clinamen = {}));

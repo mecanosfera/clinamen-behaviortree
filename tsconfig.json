@@ -1,8 +1,12 @@
 {
-	"compileOnSave": true,
 	"compilerOptions": {
-        "outDir": "./src/out/",
-        "allowJs": false,
-        "target": "es6"
-    }
+		"moduleResolution": "node",
+		"allowJs": false,
+		"target": "es6",
+		"module": "commonjs"
+	},
+	"include": [
+		"src/**/*.ts",
+		"src/*.ts"
+    ]
 }

@@ -1,4 +1,6 @@
 #!/bin/bash
+rm -r ./dist
+mkdir ./dist
+tsc --target "ES6" --outFile ./dist/clinamen-bt.js ./src/interfaces.ts  ./src/util.ts ./src/node.ts ./src/composite.ts ./src/decorator.ts  ./src/action.ts ./src/agent.ts
 
-concat -o ./src/nodes.js ./src/nodes/*.js  
-browserify index.js --s clinamenbt > ./dist/clinamen-bt.js
+#

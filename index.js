@@ -1,1 +1,1 @@
-module.exports = require('./src/nodes.js');
+module.exports = require('./dist/clinamen-bt.js');
