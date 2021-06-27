@@ -14,25 +14,38 @@ namespace clinamen {
   export const IDLE   : number = 3;
   export const ERROR  : number = 4;
 
+  //creates a global Dict with all the nodes using their ids as index
+  let nodeIndex:Dict<Node> = null;
+
+  export function getIndex():Dict<Node>{
+    return nodeIndex;
+  }
+
+  export function setIndex(nIndex:Dict<Node>):void{
+    nodeIndex = nIndex;
+  }
+
 
   export abstract class Node implements IEntity {
     _id: string;
     type: string = 'node';
     name: string;
+    comment:string;
     children: Array<Node> = [];
     stack: Stack = new Stack();
     index: number = 0;
     nodeIndex:Dict<Node>;
 
-    constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+    constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
       this.type ='node';
       this._id = data._id || this.uuid();
-      this.name = data.name;
-      this.nodeIndex = nodeIndex;
+      this.name = data.name || null;
+      this.comment = data.comment || null;
+      this.nodeIndex = nodeIndex || getIndex();
       if(this.nodeIndex){
         this.nodeIndex[this._id] = this;
       }
-      this.addChildren(data,nodeIndex);
+      this.addChildren(data,this.nodeIndex);
     }
 
     uuid(){
@@ -55,6 +68,16 @@ namespace clinamen {
           return new Limit(data,nodeIndex);
         case "tester":
           return new Tester(data,nodeIndex);
+        case "jump":
+          return new Jump(data,nodeIndex);
+        case "succeeder":
+          return new Succeeder(data,nodeIndex);
+        case "failer":
+          return new Failer(data,nodeIndex);
+        case "repeatuntilsucceeds":
+          return new RepeatUntilSucceeds(data,nodeIndex);
+        case "repeatuntilfails":
+          return new RepeatUntilFail(data,nodeIndex);
         case "action":
           return new Action(data,nodeIndex);
       }
@@ -72,7 +95,7 @@ namespace clinamen {
     addChildren(data:JsonData,nodeIndex:Dict<Node>=null):Node{
 			if(data.children){
 				for(let c of data.children){
-					this.add(c,nodeIndex);
+					this.add(c,this.nodeIndex);
 				}
 			}
 			return this;
@@ -120,6 +143,7 @@ namespace clinamen {
         _id: this._id,
   			type: this.type,
   			name: this.name,
+        comment: this.comment,
   			children: []
   		}
       if(children && this.children!=null){

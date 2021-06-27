@@ -7,7 +7,7 @@ namespace clinamen {
   }
 
   export interface IAgent extends IEntity{
-
+    blackboard:JsonData;
     test(exp:Array<any>):boolean;
     act(act:string,val:JsonData):number;
   }

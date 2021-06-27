@@ -24,17 +24,23 @@ namespace clinamen{
     return a;
   }
 
-  //[1,'==',1]
-  //['zzz','!==','dddd']
-  /*[['a','!=',1],
-      '&&',
-      [[5,'>=',4],
-        '||',
-        false
-      ]
-    ]*/
-  export function test(exp:Array<any>,func:Function=null):boolean {
-    return logical[exp[1]](exp[0] instanceof Array ? test(exp[0],func) : (func!=null ? func(exp[0]) : exp[0]),exp[2] instanceof Array ? test(exp[2],func) : (func!=null ? func(exp[2]) : exp[2]));
+  export function test(exp:Array<any>,func:Function=null,funcParam:any=null):boolean {
+    return logical[exp[1]](exp[0] instanceof Array ? test(exp[0],func) : (func!=null ? func(exp[0],funcParam) : exp[0]),exp[2] instanceof Array ? test(exp[2],func) : (func!=null ? func(exp[2],funcParam) : exp[2]));
+  }
+
+  export function calc(exp:Array<any>,func:Function=null,funcParam:any=null):any{
+    //return op[exp[1]](exp[0],exp[2]);
+    return op[exp[1]](exp[0] instanceof Array ? calc(exp[0],func) : (func!=null ? func(exp[0],funcParam) : exp[0]),exp[2] instanceof Array ? calc(exp[2],func) : (func!=null ? func(exp[2],funcParam) : exp[2]));
+  }
+
+  export function parseVal(val:any,agent:IAgent){
+    if(val instanceof Object){
+      if(!val['self'] || !agent.blackboard[val['self']]){
+        return null;
+      }
+      return agent.blackboard[val['self']];
+    }
+    return val;
   }
 
   export var logical: DictOp = {
@@ -48,6 +54,14 @@ namespace clinamen{
     "<=":	(a,b):boolean  => {return a<=b},
     "&&": (a,b):boolean  => {return a&&b},
     "||": (a,b):boolean  => {return a||b}
+  }
+
+  export var numeric: DictOp = {
+    "+": 	(a,b):number   => {return a+b},
+    "-": 	(a,b):number   => {return a-b},
+    "*": 	(a,b):number   => {return a*b},
+    "/": 	(a,b):number   => {return a/b},
+    "%": 	(a,b):number   => {return a%b}
   }
 
   export var op: DictOp = {
@@ -70,8 +84,8 @@ namespace clinamen{
   };
 
   export class Stack {
-    private _stack: Array<Node> = [];
-    state: number = IDLE;
+    private _stack:Array<Node> = [];
+    state:number = IDLE;
 
     push(node:Node):void{
       this._stack.push(node);

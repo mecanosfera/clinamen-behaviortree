@@ -9,7 +9,7 @@ namespace clinamen {
 		child: Composite;
 		target: Node;
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type = 'decorator';
 		}
@@ -17,18 +17,18 @@ namespace clinamen {
 		addChildren(data:JsonData,nodeIndex:Dict<Node>=null):Node{
 			if(data.child!=null){
 				this.add(data.child,nodeIndex);
-			} else {
-				this.child = null;
+				return this;
 			}
+			this.child = null;
 			return this;
 		}
 
-		add(node:JsonData | Composite,nodeIndex:Dict<Node>=null):Node{
-			if(!(node instanceof Node)){
-				this.child = this.get(node,nodeIndex);
+		add(data:JsonData | Composite,nodeIndex:Dict<Node>=null):Node{
+			if(!(data instanceof Node)){
+				this.child = this.get(data,nodeIndex);
 				return this;
 			}
-			this.child = node;
+			this.child = data;
 			return this;
 		}
 
@@ -46,6 +46,7 @@ namespace clinamen {
 
 		json(children:boolean = true):JsonData{
 			var js:JsonData = super.json(false);
+			console.log(this);
 			if(children){
 				js.child = this.child.json();
 			}
@@ -58,7 +59,7 @@ namespace clinamen {
 
 		targetId:string;
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type='jump';
 			this.targetId = data.targetId || null;
@@ -88,6 +89,7 @@ namespace clinamen {
 				return this.failure(stack,agent);
 			}
 			this.child = this.nodeIndex[this.targetId];
+			stack.pop();
 			stack.push(this.child);
 			stack.state = RUNNING;
 			return RUNNING;
@@ -104,7 +106,7 @@ namespace clinamen {
 
 	export class Inverter extends Decorator{
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type="inverter";
 		}
@@ -130,7 +132,7 @@ namespace clinamen {
 		runs: number = 0;
 		reset:boolean;
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type = 'limit';
 			this.max = data.max || 0;
@@ -166,21 +168,21 @@ namespace clinamen {
 
 		exp:Array<any>;
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type = 'tester';
 			this.exp = data.exp || null;
 		}
 
 		next(stack:Stack,agent:IAgent=null){
-			if(!this.child || stack.state===FAILURE){
+			if(!this.child || stack.state===FAILURE || !this.exp){
 				return this.failure(stack,agent);
 			}
 			if(stack.state===SUCCESS){
 				return this.success(stack,agent);
 			}
-			if(!agent || !this.exp || !agent.test(this.exp)){
-				return this.failure(stack,agent)
+			if((agent && !agent.test(this.exp)) || (!agent && !test(this.exp))){
+				return this.failure(stack,agent);
 			}
 			stack.state = RUNNING;
 			stack.push(this.child);
@@ -191,6 +193,11 @@ namespace clinamen {
 
 
 	export class Succeeder extends Decorator {
+
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
+			super(data,nodeIndex);
+			this.type="succeeder";
+		}
 
 		next(stack:Stack,agent:IAgent=null):number {
 			if(stack.state===RUNNING){
@@ -204,6 +211,11 @@ namespace clinamen {
 
 	export class Failer extends Decorator {
 
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
+			super(data,nodeIndex);
+			this.type="failer";
+		}
+
 		next(stack:Stack,agent:IAgent=null):number {
 			if(stack.state===RUNNING){
 				stack.push(this.child);
@@ -216,7 +228,7 @@ namespace clinamen {
 
 	export class RepeatUntilSucceeds extends Decorator {
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type="repeatuntilsucceeds";
 		}
@@ -240,7 +252,7 @@ namespace clinamen {
 
 	export class RepeatUntilFail extends Decorator {
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type="repeatuntilfails";
 		}

@@ -6,24 +6,24 @@ namespace clinamen {
 
 		children: Array<Composite> = [];
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type = 'composite';
 		}
 
-		addChildren(data:JsonData):Node{
+		addChildren(data:JsonData,nodeIndex:Dict<Node>=null):Node{
 			if(data.children){
 				for(let c of data.children){
-					this.add(c);
+					this.add(c,nodeIndex);
 				}
 			}
 			return this;
 		}
 
 
-		add(data:Node | JsonData):Node{
+		add(data:Node | JsonData,nodeIndex:Dict<Node>=null):Node{
 			if(!(data instanceof Composite)){
-				this.children.push(this.get(data));
+				this.children.push(this.get(data,nodeIndex));
 				return this;
 			}
 			this.children.push(data);
@@ -35,7 +35,7 @@ namespace clinamen {
 
 	export class Selector extends Composite{
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type="selector";
 		}
@@ -61,7 +61,7 @@ namespace clinamen {
 
 	export class Sequence extends Composite{
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type="sequence";
 		}
@@ -73,9 +73,11 @@ namespace clinamen {
 			if(stack.state===FAILURE){
 				return this.failure(stack,agent);
 			}
+
 			if(this.index>=this.children.length){
 				return this.success(stack,agent);
 			}
+			console.log(this.index);
 			var nextNode:Node = this.children[this.index];
 			this.index++;
 			stack.push(nextNode);
@@ -90,7 +92,7 @@ namespace clinamen {
 
 		rchildren: Array<Node> = null;
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type="randomSelector";
 
@@ -121,7 +123,7 @@ namespace clinamen {
 
 		rchildren: Array<Node> = null;
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type="randomSequence";
 		}

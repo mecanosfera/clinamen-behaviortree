@@ -20,19 +20,25 @@ var clinamen;
         return a;
     }
     clinamen.shuffle = shuffle;
-    //[1,'==',1]
-    //['zzz','!==','dddd']
-    /*[['a','!=',1],
-        '&&',
-        [[5,'>=',4],
-          '||',
-          false
-        ]
-      ]*/
-    function test(exp, func = null) {
-        return clinamen.logical[exp[1]](exp[0] instanceof Array ? test(exp[0], func) : (func != null ? func(exp[0]) : exp[0]), exp[2] instanceof Array ? test(exp[2], func) : (func != null ? func(exp[2]) : exp[2]));
+    function test(exp, func = null, funcParam = null) {
+        return clinamen.logical[exp[1]](exp[0] instanceof Array ? test(exp[0], func) : (func != null ? func(exp[0], funcParam) : exp[0]), exp[2] instanceof Array ? test(exp[2], func) : (func != null ? func(exp[2], funcParam) : exp[2]));
     }
     clinamen.test = test;
+    function calc(exp, func = null, funcParam = null) {
+        //return op[exp[1]](exp[0],exp[2]);
+        return clinamen.op[exp[1]](exp[0] instanceof Array ? calc(exp[0], func) : (func != null ? func(exp[0], funcParam) : exp[0]), exp[2] instanceof Array ? calc(exp[2], func) : (func != null ? func(exp[2], funcParam) : exp[2]));
+    }
+    clinamen.calc = calc;
+    function parseVal(val, agent) {
+        if (val instanceof Object) {
+            if (!val['self'] || !agent.blackboard[val['self']]) {
+                return null;
+            }
+            return agent.blackboard[val['self']];
+        }
+        return val;
+    }
+    clinamen.parseVal = parseVal;
     clinamen.logical = {
         "==": (a, b) => { return a == b; },
         "===": (a, b) => { return a === b; },
@@ -94,6 +100,10 @@ var clinamen;
 })(clinamen || (clinamen = {}));
 /// <reference path='./interfaces.ts' />
 /// <reference path='./util.ts' />
+/*/// <reference path='./agent.ts' />
+/// <reference path='./composite.ts' />
+/// <reference path='./decorator.ts' />
+/// <reference path='./action.ts' />*/
 var clinamen;
 (function (clinamen) {
     clinamen.FAILURE = 0;
@@ -101,20 +111,30 @@ var clinamen;
     clinamen.RUNNING = 2;
     clinamen.IDLE = 3;
     clinamen.ERROR = 4;
+    var nodeIndex = null;
+    function getIndex() {
+        return nodeIndex;
+    }
+    clinamen.getIndex = getIndex;
+    function setIndex(nIndex) {
+        nodeIndex = nIndex;
+    }
+    clinamen.setIndex = setIndex;
     class Node {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             this.type = 'node';
             this.children = [];
             this.stack = new clinamen.Stack();
             this.index = 0;
             this.type = 'node';
             this._id = data._id || this.uuid();
-            this.name = data.name;
-            this.nodeIndex = nodeIndex;
+            this.name = data.name || null;
+            this.comment = data.comment || null;
+            this.nodeIndex = nodeIndex || getIndex();
             if (this.nodeIndex) {
                 this.nodeIndex[this._id] = this;
             }
-            this.addChildren(data, nodeIndex);
+            this.addChildren(data, this.nodeIndex);
         }
         uuid() {
             return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
@@ -135,6 +155,8 @@ var clinamen;
                     return new clinamen.Limit(data, nodeIndex);
                 case "tester":
                     return new clinamen.Tester(data, nodeIndex);
+                case "jump":
+                    return new clinamen.Jump(data, nodeIndex);
                 case "action":
                     return new clinamen.Action(data, nodeIndex);
             }
@@ -150,7 +172,7 @@ var clinamen;
         addChildren(data, nodeIndex = null) {
             if (data.children) {
                 for (let c of data.children) {
-                    this.add(c, nodeIndex);
+                    this.add(c, this.nodeIndex);
                 }
             }
             return this;
@@ -190,6 +212,7 @@ var clinamen;
                 _id: this._id,
                 type: this.type,
                 name: this.name,
+                comment: this.comment,
                 children: []
             };
             if (children && this.children != null) {
@@ -207,22 +230,22 @@ var clinamen;
 var clinamen;
 (function (clinamen) {
     class Composite extends clinamen.Node {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.children = [];
             this.type = 'composite';
         }
-        addChildren(data) {
+        addChildren(data, nodeIndex = null) {
             if (data.children) {
                 for (let c of data.children) {
-                    this.add(c);
+                    this.add(c, nodeIndex);
                 }
             }
             return this;
         }
-        add(data) {
+        add(data, nodeIndex = null) {
             if (!(data instanceof Composite)) {
-                this.children.push(this.get(data));
+                this.children.push(this.get(data, nodeIndex));
                 return this;
             }
             this.children.push(data);
@@ -231,7 +254,7 @@ var clinamen;
     }
     clinamen.Composite = Composite;
     class Selector extends Composite {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.type = "selector";
         }
@@ -254,7 +277,7 @@ var clinamen;
     }
     clinamen.Selector = Selector;
     class Sequence extends Composite {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.type = "sequence";
         }
@@ -268,6 +291,7 @@ var clinamen;
             if (this.index >= this.children.length) {
                 return this.success(stack, agent);
             }
+            console.log(this.index);
             var nextNode = this.children[this.index];
             this.index++;
             stack.push(nextNode);
@@ -277,7 +301,7 @@ var clinamen;
     }
     clinamen.Sequence = Sequence;
     class RandomSelector extends Composite {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.rchildren = null;
             this.type = "randomSelector";
@@ -303,7 +327,7 @@ var clinamen;
     }
     clinamen.RandomSelector = RandomSelector;
     class RandomSequence extends Composite {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.rchildren = null;
             this.type = "randomSequence";
@@ -333,7 +357,7 @@ var clinamen;
 var clinamen;
 (function (clinamen) {
     class Decorator extends clinamen.Composite {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.type = 'decorator';
         }
@@ -346,12 +370,12 @@ var clinamen;
             }
             return this;
         }
-        add(node, nodeIndex = null) {
-            if (!(node instanceof clinamen.Node)) {
-                this.child = this.get(node, nodeIndex);
+        add(data, nodeIndex = null) {
+            if (!(data instanceof clinamen.Node)) {
+                this.child = this.get(data, nodeIndex);
                 return this;
             }
-            this.child = node;
+            this.child = data;
             return this;
         }
         next(stack, agent = null) {
@@ -367,6 +391,7 @@ var clinamen;
         }
         json(children = true) {
             var js = super.json(false);
+            console.log(this);
             if (children) {
                 js.child = this.child.json();
             }
@@ -375,7 +400,7 @@ var clinamen;
     }
     clinamen.Decorator = Decorator;
     class Jump extends Decorator {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.type = 'jump';
             this.targetId = data.targetId || null;
@@ -403,6 +428,7 @@ var clinamen;
                 return this.failure(stack, agent);
             }
             this.child = this.nodeIndex[this.targetId];
+            stack.pop();
             stack.push(this.child);
             stack.state = clinamen.RUNNING;
             return clinamen.RUNNING;
@@ -415,7 +441,7 @@ var clinamen;
     }
     clinamen.Jump = Jump;
     class Inverter extends Decorator {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.type = "inverter";
         }
@@ -433,7 +459,7 @@ var clinamen;
     }
     clinamen.Inverter = Inverter;
     class Limit extends Decorator {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.runs = 0;
             this.type = 'limit';
@@ -462,19 +488,19 @@ var clinamen;
     clinamen.Limit = Limit;
     //Finds another Agent id
     class Tester extends Decorator {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.type = 'tester';
             this.exp = data.exp || null;
         }
         next(stack, agent = null) {
-            if (!this.child || stack.state === clinamen.FAILURE) {
+            if (!this.child || stack.state === clinamen.FAILURE || !this.exp) {
                 return this.failure(stack, agent);
             }
             if (stack.state === clinamen.SUCCESS) {
                 return this.success(stack, agent);
             }
-            if (!agent || !this.exp || !agent.test(this.exp)) {
+            if ((agent && !agent.test(this.exp)) || (!agent && !clinamen.test(this.exp))) {
                 return this.failure(stack, agent);
             }
             stack.state = clinamen.RUNNING;
@@ -504,7 +530,7 @@ var clinamen;
     }
     clinamen.Failer = Failer;
     class RepeatUntilSucceeds extends Decorator {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.type = "repeatuntilsucceeds";
         }
@@ -524,7 +550,7 @@ var clinamen;
     }
     clinamen.RepeatUntilSucceeds = RepeatUntilSucceeds;
     class RepeatUntilFail extends Decorator {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.type = "repeatuntilfails";
         }
@@ -548,9 +574,11 @@ var clinamen;
 var clinamen;
 (function (clinamen) {
     class Action extends clinamen.Composite {
-        constructor(data, nodeIndex = null) {
+        constructor(data = {}, nodeIndex = null) {
             super(data, nodeIndex);
             this.type = data.type || 'action';
+            this.act = data.act || null;
+            this.val = data.val || null;
         }
         addChildren(node) {
             this.children = null;
@@ -586,21 +614,14 @@ var clinamen;
 var clinamen;
 (function (clinamen) {
     class Agent extends clinamen.Node {
-        constructor(data) {
+        constructor(data = {}, nodeIndex = null) {
             super(data);
-            this.mem = data.blackboard || {};
+            this.blackboard = data.blackboard || {};
             this.stack = new clinamen.Stack();
+            this.nodeIndex = nodeIndex || clinamen.getIndex();
         }
         test(exp) {
-            return clinamen.test(exp, (val) => {
-                if (val instanceof Object) {
-                    if (!val['mem'] || !this.mem[val['mem']]) {
-                        return null;
-                    }
-                    return this.mem[val['mem']];
-                }
-                return val;
-            });
+            return clinamen.test(exp, clinamen.parseVal, this);
         }
         act(act, val = null) {
             switch (act) {
@@ -609,14 +630,27 @@ var clinamen;
                 case 'change':
                     return this.change(val);
             }
-            return clinamen.RUNNING;
+            return clinamen.FAILURE;
         }
         wait() {
             return clinamen.SUCCESS;
         }
         change(val) {
             for (let k in val) {
-                this.mem[k] = val;
+                if (val[k] instanceof Array) {
+                    this.blackboard[k] = clinamen.calc(val[k], clinamen.parseVal, this);
+                }
+                else if (val[k] instanceof Object) {
+                    if (!val[k]['self'] || !this.blackboard[val[k]['self']]) {
+                        this.blackboard[k] = null;
+                    }
+                    else {
+                        this.blackboard[k] = this.blackboard[val[k]['self']];
+                    }
+                }
+                else {
+                    this.blackboard[k] = val[k];
+                }
             }
             return clinamen.SUCCESS;
         }
@@ -640,12 +674,11 @@ var clinamen;
                     return res;
                 }
             }
-            //return res;
             return this.tick(stack);
         }
         json() {
             let js = super.json();
-            js.mem = this.mem;
+            js.blackboard = this.blackboard;
             return js;
         }
     }

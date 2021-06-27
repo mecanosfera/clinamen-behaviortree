@@ -5,11 +5,13 @@ namespace clinamen {
 
 	export class Action extends Composite {
 		act:string;
-		val:JsonData;
+		val:any;
 
-		constructor(data:JsonData,nodeIndex:Dict<Node>=null){
+		constructor(data:JsonData={},nodeIndex:Dict<Node>=null){
 			super(data,nodeIndex);
 			this.type = data.type || 'action';
+			this.act = data.act || null;
+			this.val = data.val || null;
 		}
 
 		addChildren(node:Node):Node{
